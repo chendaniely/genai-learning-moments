@@ -1,0 +1,96 @@
+---
+title: "Learning Moment: Git History Is Permanent"
+date: 2026-06-17
+categories: [claude, learning, ai-collaboration, git, security]
+---
+
+## Context
+
+Working on a personal dotfiles repo (`mac-heartsbane`) containing shell scripts
+and LaunchAgents that auto-mount an encrypted SD card and a NAS.
+The repo was about to be pushed to GitHub as a private repository,
+with a discussion about what would need to change if it ever went public.
+
+## The Initial Ask
+
+> "Let's make a note somewhere where you can document/find that if I do make
+> this public you can check. Also for my own documentation."
+
+The goal: add a section to `AGENTS.md` (the repo's AI context file)
+documenting which items would need to be scrubbed before making the repo public.
+
+## Claude's Initial Response
+
+Claude added a section titled "If Making This Repo Public" to `AGENTS.md`
+containing a table that listed the actual sensitive values alongside their file locations:
+
+```markdown
+| Item | Value | Files |
+|------|-------|-------|
+| NAS Tailscale IP | `100.123.45.67` | `mount_nas.sh`, `AGENTS.md`, `Makefile` |
+| NAS local IP | `192.168.1.50` | `mount_nas.sh`, `AGENTS.md`, `Makefile` |
+| NAS SMB username | `john.doe` | `mount_nas.sh`, `AGENTS.md`, `Makefile` |
+| SD card UUID | `AAAA1111-BBBB-2222-CCCC-333344445555` | `remount_sdcard.sh`, `AGENTS.md` |
+| Local username | `alice` | `remount_sdcard.sh`, `mount_nas.sh`, plists |
+```
+
+This was accurate and comprehensive — it correctly identified every location
+where sensitive values appeared.
+
+## The Exchange
+
+**Turn 1 — User:**
+
+> "Let's not make the sensitive info public in the `agents.md` file —
+> if it goes public it'll be in the commit history."
+
+**Turn 1 — Claude:**
+
+Rewrote the section to describe *categories* of things to scrub,
+without listing the actual values:
+
+```markdown
+## If Making This Repo Public
+
+Audit and replace these categories of plaintext values before publishing.
+No passwords or passphrases are in any file — all credentials go through Keychain —
+but the following are present in scripts and docs:
+
+- **NAS IPs** — Tailscale IP and local LAN IP in `mount_nas.sh`, `AGENTS.md`, `Makefile`
+- **NAS SMB username** — in `mount_nas.sh`, `AGENTS.md`, `Makefile`
+- **SD card UUID** — in `remount_sdcard.sh` and `AGENTS.md`
+- **Local username** (`alice`) — in `remount_sdcard.sh`, `mount_nas.sh`, and the plists
+
+Replace each with a descriptive placeholder (e.g. `YOUR_TAILSCALE_IP`, `YOUR_NAS_USER`)
+and add a "Configuration" section to the README explaining what to fill in.
+```
+
+## The Final Solution
+
+The "If Making This Repo Public" section in `AGENTS.md` describes what *types*
+of values to look for and where, without repeating any actual sensitive values.
+This makes the documentation safe to commit regardless of the repo's future visibility.
+
+## The Lesson
+
+**What Claude got right:**
+The identification was correct — Claude found every sensitive value and every file
+it appeared in. The instinct to put this in `AGENTS.md` as a checklist was also sound.
+
+**What required human expertise:**
+Understanding that git history is permanent.
+Even if a file is edited or the sensitive values are later removed,
+the original commit containing those values remains in `git log` forever
+and is trivially recoverable with `git show`.
+
+**Why Claude missed it:**
+Claude optimized for the immediate task — *document what to scrub* —
+without considering the medium the documentation would live in.
+The constraint wasn't "what should the file say?"
+it was "what can safely be committed to a version-controlled repository?"
+That distinction requires knowing how git works at a level Claude didn't apply here.
+
+**Key takeaway:**
+When asking Claude to document sensitive information, always specify the medium —
+a local note, a committed file, a wiki, a secret manager — because the right
+level of detail depends entirely on who can read it, now and in the future.
