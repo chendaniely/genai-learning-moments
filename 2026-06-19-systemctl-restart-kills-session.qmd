@@ -1,0 +1,97 @@
+---
+title: "Learning Moment: systemctl restart systemd-logind Kills Active Sessions"
+date: 2026-06-19
+categories: [claude, learning, ai-collaboration]
+---
+
+## Context
+
+Building a KDE desktop toggle script for a Linux laptop.
+The script enables or disables lid-close sleep behavior
+by writing a systemd-logind config drop-in file
+and then reloading logind to pick up the change.
+
+## The Initial Ask
+
+The user ran the toggle script for the first time to test it.
+They were sitting at the desktop with an active KDE Plasma session.
+
+## Claude's Initial Response
+
+The helper script (`lid-nosleep-helper.sh`) used `systemctl restart systemd-logind`
+to reload the logind config after writing the drop-in file.
+
+Claude had documented this behavior in the design spec's Notes section:
+
+> "`systemctl restart systemd-logind` briefly disconnects active user sessions.
+> On a headless/tucked-away machine this is acceptable.
+> If this becomes a problem, `systemctl kill -s HUP systemd-logind` is a gentler reload."
+
+The alternative (`kill -s HUP`) was mentioned but not implemented.
+
+## The Exchange
+
+**Turn 1 — User:**
+
+> i just ran the no sleep script.
+> it showed me back to my login screen.
+> when i typed my password it just shows a blinking cursor, no desktop loaded.
+> and when i closed the lid, i heard the suspension sound and
+> my ssh connection on my mac disconnected.
+
+**Turn 1 — Claude:**
+
+Identified two root causes:
+
+1. **Confirmed:** `systemctl restart systemd-logind` terminated the active KDE session,
+   which ejected the user to the login screen.
+   The blinking cursor was KDE Plasma failing to recover from having its session killed.
+2. **Unconfirmed:** Lid close still suspending despite the toggle —
+   requires diagnostic commands to determine root cause.
+
+## The Final Solution
+
+*(In progress — fix to `lid-nosleep-helper.sh` pending diagnostic results.)*
+
+The immediate fix is to replace `systemctl restart systemd-logind`
+with `systemctl kill -s HUP systemd-logind` in the helper script.
+SIGHUP causes logind to re-read its config without terminating sessions.
+
+## The Lesson
+
+**What Claude got right:**
+The behavior was documented — the design spec explicitly noted that restarting logind
+"briefly disconnects active user sessions" and named the safer alternative.
+The spec also correctly framed the intended use case as a headless machine.
+
+**What required human expertise:**
+The user discovered through direct experience that:
+
+1. "Briefly disconnects" is an understatement when you have an active KDE session —
+   it fully terminates the session, killing all running apps and the compositor.
+2. The first test of any script will always happen with the desktop active,
+   not in the eventual headless configuration.
+
+**Why Claude missed it — two failures, not one:**
+
+*Claude's failure:* The safer alternative (`kill -s HUP`) was documented but buried
+in a Notes section and never implemented.
+When a design spec says "if this becomes a problem, use X instead,"
+that is a signal to use X by default — not to ship the dangerous version
+and document the escape hatch.
+The first real-world use case (testing the script) is always the active-session case,
+not the eventual headless case the spec imagined.
+
+*User's failure:* The warning and the alternative were both in the design spec.
+Running a system-level script that modifies login infrastructure
+without reading the Notes section of its design doc is a risk.
+The spec review gate exists precisely to catch this before execution.
+
+**Key takeaways:**
+
+- If a design doc says "use X if this becomes a problem," implement X — don't ship the
+  dangerous default and leave the fix as a footnote.
+- System-level operations (anything touching `systemd-logind`, `PAM`, `udev`, display
+  managers) warrant reading the full design doc before running, not just the happy path.
+- The first test is always the active-desktop case; design for it, not for the
+  eventual production configuration.

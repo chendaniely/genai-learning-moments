@@ -1,0 +1,141 @@
+---
+title: "Learning Moment: Slide Title Text Contrast"
+date: 2026-06-25
+categories: [claude, learning, ai-collaboration, quarto, css]
+---
+
+## Context
+
+Building a Quarto RevealJS presentation for an organization with a dark, full-bleed
+background image on the title slide. The image was a deep navy maritime scene set at
+`0.6` opacity via `data-background-opacity`. The brand's foreground text color was
+dark navy, which was hard to read against the similarly dark background.
+
+## The Initial Ask
+
+> "is there a way to have a really thin white border around the text? to have more
+> contrast between the foreground and background"
+
+## Claude's Initial Response
+
+Claude created a `custom.css` file and wired it into the presentation via `css: custom.css`
+in the YAML front matter. The CSS applied `-webkit-text-stroke` with `paint-order: stroke fill`
+to all four title slide elements at a single font-size (inherited from the theme):
+
+```css
+#title-slide .title,
+#title-slide .subtitle,
+#title-slide .author,
+#title-slide .date {
+  -webkit-text-stroke: 1.5px white;
+  paint-order: stroke fill;
+}
+```
+
+The stroke technique was correct. The problem was that Claude set no explicit font sizes,
+leaving all elements at whatever the RevealJS theme happened to inherit — which rendered
+too small for slide use.
+
+## The Exchange
+
+**Turn 1 — User:**
+
+> "i need the title font bigger, the date and subtitle text is too small with the text-shadow"
+
+**Turn 1 — Claude:**
+
+Split the selectors and added font sizes, but guessed conservatively:
+
+```css
+#title-slide .title    { font-size: 2.8em; -webkit-text-stroke: 1.5px white; paint-order: stroke fill; }
+#title-slide .subtitle { font-size: 1.2em; -webkit-text-stroke: 1px white;   paint-order: stroke fill; }
+#title-slide .author,
+#title-slide .date     { font-size: 1em;   -webkit-text-stroke: 1px white;   paint-order: stroke fill; }
+```
+
+**Turn 2 — User:**
+
+> "need to be bigger."
+
+**Turn 2 — Claude:**
+
+Increased all sizes substantially:
+
+```css
+#title-slide .title    { font-size: 4em;   -webkit-text-stroke: 1.5px white; paint-order: stroke fill; }
+#title-slide .subtitle { font-size: 1.8em; -webkit-text-stroke: 1px white;   paint-order: stroke fill; }
+#title-slide .author,
+#title-slide .date     { font-size: 1.4em; -webkit-text-stroke: 1px white;   paint-order: stroke fill; }
+```
+
+## The Final Solution
+
+`custom.css` with differentiated font sizes and a white text stroke for contrast,
+referenced from the document's YAML front matter:
+
+```yaml
+format:
+  revealjs:
+    css: custom.css
+    title-slide-attributes:
+      data-background-image: "img/image.jpg"
+      data-background-size: "cover"
+      data-background-opacity: "0.6"
+```
+
+```css
+#title-slide .title {
+  font-size: 4em;
+  -webkit-text-stroke: 1.5px white;
+  paint-order: stroke fill;
+}
+
+#title-slide .subtitle {
+  font-size: 1.8em;
+  -webkit-text-stroke: 1px white;
+  paint-order: stroke fill;
+}
+
+#title-slide .author,
+#title-slide .date {
+  font-size: 1.4em;
+  -webkit-text-stroke: 1px white;
+  paint-order: stroke fill;
+}
+```
+
+Key CSS details worth remembering:
+
+- `-webkit-text-stroke` draws a true vector stroke around each glyph (cleaner than stacked `text-shadow`)
+- `paint-order: stroke fill` ensures the stroke renders *behind* the fill, so the interior color is not overwritten
+- Thinner stroke (`1px`) on smaller elements avoids a heavy, painted look
+
+## The Lesson
+
+**What Claude got right:**
+
+The stroke technique was correct: `-webkit-text-stroke` with `paint-order: stroke fill`
+is the right approach for a clean outline. Splitting selectors to allow different stroke
+weights for the title versus supporting text was also a good call.
+
+**What required human expertise:**
+
+The user was looking at the rendered slide on screen and could see immediately that the
+text was too small. Claude had no access to that visual feedback and defaulted to font
+sizes that feel reasonable in a browser tab — not on a projected slide viewed at a
+distance from the audience.
+
+**Why Claude missed it:**
+
+Claude optimized for the stated goal (add a white border) without considering the
+output medium. RevealJS presentations are viewed at projection distance, which demands
+much larger type than a typical webpage. Claude had no runtime rendering context and
+no way to evaluate "is this big enough?" without human eyes on the result. The first
+size guess (2.8em) was also conservative — Claude erred toward "not too big" rather
+than "readable across a room."
+
+**Key takeaway:**
+
+Font sizes for presentations need human visual validation. "Looks reasonable in a
+browser tab" and "readable on a projected slide" are different targets by roughly
+a factor of two — only the human in the room can judge which one was hit.

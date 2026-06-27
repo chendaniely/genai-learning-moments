@@ -1,0 +1,111 @@
+---
+title: "Learning Moment: Documentation Single Source of Truth"
+date: 2026-06-19
+categories: [claude, learning, ai-collaboration, documentation]
+---
+
+## Context
+
+Setting up `CLAUDE.md` and project documentation for a personal Python tool (reelkeeper) that
+syncs Instagram saved reels into parquet and Google Sheets. The project had existing docs in a
+`docs/` folder and a `README.md`. The task was to get project context and future plans into
+durable files so future Claude sessions could pick up where the conversation left off.
+
+## The Initial Ask
+
+> "go back into history and make sure the README.md file has the proper set of instructions of
+> making the reelkeeper google app and auth. i had trouble with that a little and needed
+> clarification (especially that test user step was hard to find). then point the claude to that
+> section in the readme.md file"
+
+## Claude's Initial Response
+
+Claude pulled the full 6-step OAuth walkthrough out of `docs/setup.md` and pasted it verbatim
+into `README.md`, creating an identical copy in both places. The reasoning was that the README
+is the primary entry point, so the instructions should live there.
+
+Claude also added a section to `CLAUDE.md` pointing to `README.md → "Set up Google Sheets
+access"` as the canonical location for auth setup notes.
+
+## The Exchange
+
+**Turn 1 — User:**
+
+> "yes the docs in docs/ should be linked in both readme.md and claude on what they are for.
+> i didn't know to look in docs because i was only reading readme and claude. usually the user
+> is only reading readme.md and you, claude are reading claude.md and readme.md so we need to
+> make sure cross links and references are all specified correctly. this way we are also not
+> duplicating documentation"
+
+**Turn 1 — Claude:**
+
+Restructured correctly: removed the inlined copy from `README.md`, replaced it with a short
+pointer to `docs/setup.md` with a one-line ⚠️ callout about the test-user gotcha. Added a docs
+index table to `CLAUDE.md` listing every file in `docs/` with its purpose and key gotcha.
+
+**Turn 2 — User:**
+
+> "we should also note that we should also keep the README.md file in sync all the time. stale
+> docs are worse than no docs."
+
+**Turn 2 — Claude:**
+
+Added a "Documentation rules" block at the top of `CLAUDE.md`:
+- Keep README.md in sync at all times — update in the same commit as code changes
+- No duplication between files — each piece of info lives in exactly one place
+
+## The Final Solution
+
+Three files, three audiences, zero duplication:
+
+| File | Audience | Role |
+|------|----------|------|
+| `README.md` | User | Quick start + links to docs/ with one-line gotcha warnings |
+| `docs/setup.md` | User (via link) | Full OAuth walkthrough — single source of truth |
+| `docs/meta-export.md` | User (via link) | Full Meta export walkthrough — single source of truth |
+| `CLAUDE.md` | Claude | Project context + docs index table describing every file |
+
+`README.md` links to `docs/` with enough context (gotcha callouts) that the user knows what
+they're walking into before they click. `CLAUDE.md` lists every doc with its purpose and key
+caveats, so any future Claude session knows exactly where to look or update. Neither file
+duplicates any content from `docs/`.
+
+## The Lesson
+
+**What Claude got right:**
+
+The auth content itself was complete and accurate. The test-user gotcha was correctly identified
+as the hardest step and was called out clearly.
+
+**What required human expertise:**
+
+Understanding how the *reading audience* differs across files. The user reads `README.md` and
+`docs/`. Claude reads `CLAUDE.md` and `README.md`. Nobody cross-reads all three by default —
+so each file needs explicit links outward to the others, not copies of their content.
+
+The user also had the experienced instinct that duplication always rots: when the auth flow
+changes, a developer updates one file and forgets the copy. Stale docs are worse than no docs
+because they actively mislead.
+
+A second constraint Claude didn't raise: **`docs/` is a reserved name in common tooling.**
+GitHub Pages can be configured to serve from a `docs/` folder, and Quarto outputs its built
+site to `docs/` by default when building for GitHub Pages. Using `docs/` for hand-written
+reference files is safe only when the project is *not* doing either of those things. If the
+project ever adds a Quarto site or enables GitHub Pages from `docs/`, the folder would need to
+be renamed (e.g. `reference/`, `user-docs/`) or Quarto's output directory reconfigured —
+otherwise the build would overwrite the hand-written files. This is a project-topology
+constraint Claude should ask about before proposing a `docs/` folder structure.
+
+**Why Claude missed it:**
+
+Claude optimized for "the user needs this information" without modeling *where the user will
+actually look*. Inlining felt helpful in the moment — fewer clicks, everything in one place.
+But it created a maintenance problem and violated the principle of a single source of truth.
+Claude also didn't ask about the project's deployment topology before recommending a `docs/`
+folder — a name that carries implicit meaning in GitHub Pages and Quarto workflows.
+
+**Key takeaway:**
+
+Before duplicating documentation, ask who reads which file and when. Before naming a folder
+`docs/`, ask whether GitHub Pages or Quarto is in play — both claim that name and will
+silently overwrite hand-written files if you're not careful.

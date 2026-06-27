@@ -1,0 +1,74 @@
+---
+title: "Learning Moment: Specific Filenames Over Phase Names"
+date: 2026-06-19
+categories: [claude, learning, ai-collaboration]
+---
+
+## Context
+
+Writing design spec documents for a new machine directory in a dotfiles repo.
+The session would produce multiple specs over time —
+one for SSH setup, one for a lid-close sleep toggle, and more in the future.
+
+## The Initial Ask
+
+Claude had just agreed to write a spec document and proposed a filename.
+
+## Claude's Initial Response
+
+Claude proposed: `2026-06-19-setup-design.md`
+
+The name followed the date prefix convention but used "setup" —
+a word that describes the *phase* of work rather than the *feature* being designed.
+
+## The Exchange
+
+**Turn 1 — User:**
+
+> let's not just call it setup-design and give it a better file name
+> for this particular task.
+> i will have more scripts in the future.
+
+**Turn 1 — Claude:**
+
+Proposed `2026-06-19-ssh-and-lid-nosleep-design.md`,
+combining both features into one file.
+
+**Turn 2 — User:**
+
+> let's make ssh separate from lid-nosleep
+
+**Turn 2 — Claude:**
+
+Split into two files:
+
+- `2026-06-19-ssh-setup-design.md`
+- `2026-06-19-lid-nosleep-design.md`
+
+## The Final Solution
+
+Each spec file is named after the specific feature it describes,
+not after the development phase ("setup", "design", "config").
+When a session covers multiple independent features,
+each gets its own file rather than being bundled into one.
+
+## The Lesson
+
+**What Claude got right:**
+Using a date prefix and following a consistent naming pattern.
+
+**What required human expertise:**
+The user knew there would be more scripts in this directory over time.
+"Setup" is meaningful today but becomes ambiguous the moment a second script lands —
+*which* setup? From *when*?
+Feature-specific names stay unambiguous no matter how many files accumulate.
+
+**Why Claude missed it:**
+Claude named the file for the task at hand ("setting up the machine")
+without considering how the name would read in a directory listing six months later.
+AI tools tend to optimize for the current moment rather than long-term navigability.
+
+**Key takeaway:**
+Name files after what they describe, not after what you're doing with them —
+"setup" is a phase that ends, but "ssh-setup" and "lid-nosleep" are features
+that remain discoverable forever.

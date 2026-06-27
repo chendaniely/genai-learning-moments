@@ -1,0 +1,71 @@
+---
+title: "Learning Moment: Skill Defaults vs. Project Context"
+date: 2026-06-19
+categories: [claude, learning, ai-collaboration]
+---
+
+## Context
+
+Setting up a new machine directory in a dotfiles repo.
+The repo organizes everything by machine (`mac-heartsbane/`, `system76-blackfyre/`, etc.),
+so each machine directory is self-contained.
+Claude was following the brainstorming skill,
+which instructs it to save design specs to `docs/superpowers/specs/` at the repo root.
+
+## The Initial Ask
+
+Claude was mid-brainstorming and reached the step where it writes the spec document.
+It ran:
+
+```bash
+mkdir -p /path/to/dotfiles/docs/superpowers/specs
+```
+
+## Claude's Initial Response
+
+Claude was following the skill's default path literally:
+`docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` at the repo root.
+
+## The Exchange
+
+**Turn 1 — User:**
+
+> i think the specs are specific to the system76 computer?
+> should it go in that directory instead?
+> why under overall docs in root?
+
+**Turn 1 — Claude:**
+
+Agreed immediately.
+The spec describes a single machine's setup,
+so it belongs inside that machine's directory, not at the repo root.
+Redirected to `system76-blackfyre/docs/2026-06-19-<topic>-design.md`.
+
+## The Final Solution
+
+Specs for machine-specific work live inside the machine's own directory:
+`system76-blackfyre/docs/`.
+The brainstorming skill's default path (`docs/superpowers/specs/`) is appropriate
+for project-wide specs but not for machine-specific ones.
+
+## The Lesson
+
+**What Claude got right:**
+Following the skill's process — brainstorming, clarifying, writing a spec before building.
+The workflow was correct.
+
+**What required human expertise:**
+Recognizing that the skill's default file location is a generic convention
+that doesn't fit every project structure.
+The repo's organizing principle (one directory per machine, each self-contained)
+should override the skill's default.
+
+**Why Claude missed it:**
+Claude followed the skill instruction literally without asking
+"does this convention fit the project I'm working in?"
+Skill defaults are written for a generic project;
+they don't automatically adapt to a specific repo's layout.
+
+**Key takeaway:**
+Skill defaults tell Claude *where to look*, not *what's right for this project* —
+always ask whether the convention fits the project structure before accepting it.
