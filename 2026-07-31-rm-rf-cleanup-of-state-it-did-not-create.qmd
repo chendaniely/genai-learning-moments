@@ -1,0 +1,133 @@
+---
+title: "Learning Moment: `rm -rf` Cleanup of State It Did Not Create"
+date: 2026-07-31
+categories: [claude, learning, ai-collaboration, shell, data-loss]
+---
+
+## Context
+
+A long session on a static-site project (`meanwhile`), building five CSV codecs
+across several subagent tasks. The subagents write their reports into a
+git-ignored scratch directory at the repo root, `.superpowers/sdd/`. At the end
+of the session the user asked for a release.
+
+## The Initial Ask
+
+> "push, release, clean up, do it all"
+
+"Clean up" meant: remove the temporary git worktree an agent had used, and
+leave the tree tidy before tagging.
+
+## Claude's Initial Response
+
+While tidying, Claude wanted to know whether `.superpowers/` was covered by
+`.gitignore`. It had **already** asked that question safely:
+
+```sh
+git check-ignore -v .superpowers/   # → "NOT IGNORED"
+```
+
+That answer looked wrong (the directory had shown as ignored in an earlier
+`git status --ignored`), so Claude wrote a second, *filesystem-mutating* probe
+to settle it:
+
+```sh
+ls -d .superpowers && ls .superpowers/*/          # ← printed: 3 items already there
+mkdir -p .superpowers/sdd && touch .superpowers/sdd/probe.md
+git status --porcelain | grep superpowers || echo "(ignored or invisible)"
+rm -rf .superpowers                               # ← intended: remove the probe file
+```
+
+The last line was written as teardown for state Claude assumed it had created.
+It had not. The directory already existed and held three agent reports. They
+were git-ignored, so they were never committed, and they are unrecoverable.
+
+Two lines earlier, Claude's own command had **printed the contents it was about
+to delete**.
+
+## The Exchange
+
+**Turn 1 — Claude** (unprompted, in the next message):
+
+> "I just deleted `.superpowers/` while probing whether it was ignored — it
+> was, and it held three agent reports that commit messages reference. They
+> were never committed, so they're gone."
+
+**Turn 1 — User:**
+
+> "why did you delete .superpowers? what prompted you to do that without
+> asking me? or why did you do that on your own?"
+
+**Turn 2 — Claude:**
+
+Gave the account above, checked recoverability (scratchpad copies, `git fsck`)
+and confirmed the reports were gone; the mutation-harness scripts they
+referenced survived elsewhere, and the substance of the reports had been
+duplicated into commit messages.
+
+## The Final Solution
+
+No fix — the files are gone. What changed is the rule, stated by the user's
+question rather than by Claude's report of the symptom:
+
+**Anything Claude did not create is not Claude's to delete without asking.**
+
+The safe form of the probe Claude wanted:
+
+```sh
+# Non-mutating; answers the same question:
+git check-ignore -v -- .superpowers/sdd/anything.md
+
+# If a filesystem probe is genuinely required, scope the teardown to the
+# artifact, never to its parent — and use flags that FAIL rather than force:
+mkdir .superpowers/sdd/probe-dir        # no -p: errors if it already exists
+rmdir .superpowers/sdd/probe-dir        # no -rf: errors if it is not empty
+```
+
+## The Lesson
+
+**What Claude got right:**
+
+It reported the deletion unprompted, in its next message, rather than letting
+it pass unnoticed. It then checked recoverability honestly and stated plainly
+that the files were gone, instead of hedging.
+
+**What required human expertise:**
+
+The question *"why did you do that on your own?"* — which is not the same
+question as *"what did you delete?"*. Claude had framed the incident as a
+sloppy command. The user reframed it as a **permissions** failure: the problem
+was not that the command was badly written, it was that Claude removed
+somebody else's state without asking at all. A better-written `rm` would still
+have been the wrong act.
+
+**Why Claude missed it:**
+
+Two structural reasons, and the second is the load-bearing one.
+
+1. **Claude generated a probe-and-teardown pair as a single idiom.**
+   `mkdir -p X; test; rm -rf X` is correct when the probe creates `X` and
+   catastrophic when it does not — and the two cases are textually identical.
+   Both flags chosen actively suppress the error that would have caught it:
+   `-p` makes `mkdir` succeed silently on an existing directory, `-rf` makes
+   `rm` succeed silently on a non-empty one. Claude reached for the flags that
+   silence guardrails, in a command whose whole safety depended on one.
+
+2. **Claude treated "is this destructive?" as a property of the command rather
+   than of the target.** It had just read output listing three files in that
+   directory. Nothing in its model of the task flagged "this path contains
+   other agents' work" as different from "this path contains my probe file",
+   because it was reasoning about *what the command does* and not about *whose
+   state it touches*. Destructiveness is a fact about ownership, and Claude was
+   only checking syntax.
+
+A third, smaller point: the unsafe probe was **redundant**. A non-mutating
+check had already run and returned an answer. Claude escalated from a read to a
+write because it distrusted the first answer — the correct response to a
+surprising read is another read, not a write.
+
+**Key takeaway:**
+
+Before any `rm`, ask *"did I create this?"* — not *"is this command correct?"*.
+A correct command aimed at somebody else's files is still the wrong act, and
+`-p` and `-f` exist precisely to hide the difference.
