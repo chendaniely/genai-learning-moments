@@ -1,0 +1,155 @@
+---
+title: "Learning Moment: Consent Is Not the Same as Redaction"
+date: 2026-08-15
+categories: [claude, learning, ai-collaboration]
+---
+
+## Context
+
+Reviewing `check-setup-mds.sh`, the script UBC MDS students run to verify their software
+installation. The script writes `check-setup-mds.log`, and **students are instructed to
+submit that log to their instructors** as proof their setup works.
+
+While auditing the script, a check turned up this near the end:
+
+```bash
+echo -e "${ORANGE}## Environmental variables${NC}" >> check-setup-mds.log
+env >> check-setup-mds.log
+```
+
+The full process environment — every API key and access token the student happens to have
+exported — was being written into the file they were about to send to their instructors.
+Running the script on a developer machine confirmed it: variables shaped like
+`GITHUB_TOKEN=ghp_AAAABBBBCCCCDDDD1111` and `SERVICE_TOKEN=perm-QWERTY.1234.abcd` landed in
+the log verbatim.
+
+Two further details made it worse. The section was appended to the file *after* the script
+had already printed its output to the screen, so **the student never saw it**. And the
+script's closing line asked them to "review that there is no SENSITIVE INFORMATION such as
+passwords or access tokens" — auditing a section they had no way of knowing existed.
+
+## The Initial Ask
+
+> "we might want to remove (or at least comment out or give the user ability to say no —
+> default no, optional yes — to dump out env variables. those will hold secrets that i've
+> seen students dump into their homework assignments without them realizing what is being
+> reported"
+
+## Claude's Initial Response
+
+I treated it as a data-minimisation problem and built a solution with three parts:
+
+1. **An allowlist.** Instead of dumping everything, write ~20 named variables that are
+   diagnostically useful and cannot hold a credential: `PATH`, `SHELL`, `R_LIBS_USER`,
+   `PYTHONPATH`, `CONDA_PREFIX`, and so on.
+2. **An opt-in flag** for the full dump: `MDS_INCLUDE_ENV=1`, chosen for consistency with an
+   existing `MDS_BASE_URL` override already in the script.
+3. **Redaction** of the shell-config sections, masking any value whose variable name looked
+   like a credential.
+
+I tested it with a planted canary and reported that the default path leaked nothing. It was
+a genuine improvement — the actual secrets no longer appeared — and I thought it was done.
+
+## The Exchange
+
+**Turn 1 — User:**
+
+> "i don't want environment variables in the log file without an explicit YES from the user.
+> not showing it to the user, but still putting it into the log file where we have them send
+> us the log file as part of installation check is misleading and goes against security and
+> trust"
+
+**Turn 1 — Claude:**
+
+The allowlist was still environment data going into a file the student sends, without the
+student ever seeing it on screen. "Fewer secrets" is not the same as "nothing they didn't
+consent to." I removed the allowlist entirely — zero environment variables in the log by
+default — and added an on-screen notice when the opt-in was used, so the disclosure was not
+buried in a file about to be transmitted.
+
+**Turn 2 — User:**
+
+> "i want you to prompt the user yes/no where the default is NO. so it's part of running the
+> script. new student's won't know how to set environment variables, and we don't want to set
+> the value to 1 for them during the install process. that defeats the purpose"
+
+**Turn 2 — Claude:**
+
+The flag was wrong for this user population. A TA telling a student "run it with
+`MDS_INCLUDE_ENV=1`" produces exactly the outcome the change was meant to prevent — the
+student sets it without understanding what it does. Replaced with a runtime prompt.
+
+## The Final Solution
+
+```bash
+include_env='no'
+if [ -t 0 ]; then
+    echo
+    echo 'Your environment variables can help diagnose PATH problems, but they often hold'
+    echo 'API keys and access tokens, and you are about to share this log with instructors.'
+    read -r -p 'Include environment variables in the log? [y/N] ' include_env_reply
+    include_env_reply=$(printf '%s' "$include_env_reply" | tr '[:upper:]' '[:lower:]')
+    case "$include_env_reply" in y | yes) include_env='yes' ;; esac
+fi
+```
+
+Design properties, each verified by execution rather than assumed:
+
+- **Default no.** Enter, `n`, and any unrecognised input (`sure`, `ok`, `1`, `true`) all
+  leave it out. Only `y`/`yes` in any capitalisation opt in.
+- **Asked at runtime**, not exposed as a variable — the consent happens in the student's
+  world, not the developer's.
+- **`[ -t 0 ]` guard.** With nothing attached to stdin the prompt is skipped entirely and the
+  answer stays no, so scripted and CI runs default to safe instead of hanging.
+- Shell-config sections are still recorded, because a leftover `PATH` edit or `conda init`
+  block is a common cause of real failures — but credential-shaped values are masked.
+
+One bug surfaced only through testing: the redaction pattern matched `PAT` inside `PATH=`
+and masked the single most diagnostically important variable in the file. A word boundary
+fixed it. Another surfaced because a first test harness piped input into the script, which
+meant `[ -t 0 ]` was false and every case silently took the default branch — the tests
+"passed" while exercising nothing.
+
+## The Lesson
+
+**What Claude got right:**
+
+Identifying the vulnerability at all — it took actually running the script and inspecting
+the output file, not reading it. The threat model was correct: environment dumps carry
+credentials, and this log is transmitted. Redaction, allowlisting and canary-based testing
+are all sound techniques, and the shell-config masking survived into the final version.
+
+**What required human expertise:**
+
+Two things, and they are different in kind.
+
+The first was a **principle**: in a system where a file is transmitted, anything placed in
+that file without the user seeing it is a trust violation, independent of whether it contains
+a secret. I was solving "reduce the exposure." The actual problem was "obtain informed
+consent." Those produce different designs, and only the second one survives a student asking
+"what did I just send you?"
+
+The second was **knowledge of the user population**. Setting an environment variable is a
+trivial ask for a developer and a genuine barrier for a first-week student — and, crucially,
+the workaround for that barrier is a TA saying "just run it with the flag," which reproduces
+the original harm at scale. The mechanism has to live where the user already is.
+
+**Why Claude missed it:**
+
+Both misses came from optimising against the wrong frame. I read the request as a security
+task and reached for security tooling — minimise, redact, allowlist. The word "explicit YES"
+was in the original prompt and I mapped it onto "an explicit action by the user," which a
+flag technically satisfies, rather than "informed agreement at the moment of collection."
+
+The flag choice compounded it. I justified `MDS_INCLUDE_ENV=1` by consistency with an
+existing override in the same file — a real and normally good instinct — but that override
+exists for maintainers doing preview deploys, not for students. **I matched the convention of
+the codebase instead of the capability of its users**, and nothing in the code itself would
+have told me the difference. The script does not know who runs it; only the person who
+teaches the course does.
+
+**Key takeaway:**
+
+Reducing what gets collected is a security fix; asking permission is a trust fix — and when
+the artifact gets shared with someone who has power over the user, only the second one is
+sufficient. Ask where the user already is, default to no, and make unrecognised input mean no.
