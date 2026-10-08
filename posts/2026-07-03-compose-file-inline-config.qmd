@@ -1,7 +1,7 @@
 ---
 title: "Learning Moment: Don't Reach for a Separate Config File Until You Know What's Actually Secret"
 date: 2026-07-03
-categories: [claude, learning, ai-collaboration, docker, security, over-engineering, dotfiles]
+categories: [claude, learning, ai-collaboration, docker, security, over-engineering, dotfiles, plan-review]
 ---
 
 ## Context
