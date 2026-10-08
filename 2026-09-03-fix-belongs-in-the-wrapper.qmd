@@ -1,0 +1,210 @@
+---
+title: "Learning Moment: A New Function One Underscore From the Old One"
+date: 2026-09-03
+categories: [claude, learning, ai-collaboration]
+---
+
+## Context
+
+A course-management script that drives GitHub Enterprise as an LMS — it creates
+per-student assignment repos, grants access, opens notification issues, and
+collects grades. For years it depended on a *fork* of `github3.py`, pinned to a
+2016 alpha (`1.0.0a4`), because the fork carried a handful of patches the
+upstream library lacked. That fork is now unmaintained, and the pinned alpha
+does not even import on modern Python: it does `from collections import
+Callable`, removed in 3.10.
+
+The task was to move to upstream `github3.py` 4.0.1.
+
+## The Initial Ask
+
+> "i'm trying to get the code working with the upgraded github3 package. it was
+> previously using a forked repo that is no longer maintianed."
+
+## Claude's Initial Response
+
+The diagnosis went well. Claude cloned the fork, diffed it against its 2016
+upstream base, and found four additions — two of which are now upstream, and
+two of which the project never called. Nothing in the fork was load-bearing.
+
+Three real regressions came from the version jump itself. The interesting one:
+`repo.add_collaborator()` in 4.x counts only HTTP 201 as success, but GitHub
+answers **204** when the user is already a collaborator. The fork had checked
+for 204. So a re-run reported every student who already had access as a
+failure — 151 of 167 repos printing `FAILED to add ...` while the underlying
+API call was in fact succeeding.
+
+Claude confirmed this against the live server rather than assuming it: a known
+existing collaborator returned 204, a student who was not an org member
+returned a genuine 404.
+
+The fix Claude wrote was a new module-level function:
+
+```python
+def add_collaborator(repo, username, permission="push"):
+    """Add `username` to `repo` as a collaborator, returning True on success."""
+    if not username:
+        return False
+    url = repo._build_url("collaborators", str(username), base_url=repo._api)
+    response = repo._put(url, data=json.dumps({"permission": permission}))
+    if response.status_code in (201, 204):
+        return True
+    if response.status_code >= 400 and response.status_code != 404:
+        raise github3.exceptions.error_for(response)
+    return False
+```
+
+and then rewired the call sites to use it, including the one inside the
+project's own existing method:
+
+```python
+    def _add_collaborator(self, repo, user, permission="push"):
+        ...
+        try:
+            output = add_collaborator(repo, user, permission=permission)
+        except GitHubError as error:
+            ...
+```
+
+Claude verified it end to end against 167 real repos — exit 0, no tracebacks,
+151 spurious failures gone — and reported success.
+
+## The Exchange
+
+**Turn 1 — User:**
+
+> "why did you create a new add_collaborator function when i already have an
+> \_add_collaborator method? try again"
+
+**Turn 1 — Claude:**
+Conceded immediately, because the objection is plainly right. The file now
+contained `add_collaborator` and `_add_collaborator`, names one underscore
+apart, splitting a single job in half. `_add_collaborator` had *always* been
+the project's wrapper for "add a collaborator and report what happened" — it
+warns when the user is not an org member, checks the repo is known, catches
+`GitHubError`, and prints the success or failure line. The status-code
+handling belonged inside it.
+
+Claude checked one thing before restructuring: whether `github3`'s
+`ConnectionError` is a subclass of `GitHubError`. It is not — it descends from
+`TransportError` — which meant the existing `except GitHubError` was never
+catching timeouts and the refactor would not silently change error handling.
+
+The helper was deleted and its logic moved inline. The `pushfeedback` call
+sites went back to the library's own `repo.add_collaborator()`.
+
+A re-run gave identical counts to the previous run, confirming a pure refactor.
+
+**Turn 2 — User:**
+
+> "a few things: can you actuall revert your change you just made. and have it
+> create 2 functions like before? then commit that, THEN commit the changes for
+> incorporating into \_add_collaborator. i would like to use those 2 diffs as a
+> teaching example"
+
+**Turn 2 — Claude:**
+Reverted to the two-function version, committed it, re-applied the refactor,
+and committed that — producing two clean diffs where there would otherwise have
+been one commit and a discarded mistake.
+
+## The Final Solution
+
+The status handling lives in the method that was already there:
+
+```python
+    def _add_collaborator(self, repo, user, permission="push"):
+        if not self.org.is_member(user):
+            print("Warning: %s is not a member of the %s organization. ..." % (user, self.org.login))
+
+        if repo.name not in self.repos:
+            print("Could not find Repository %s." % repo.name)
+            return
+
+        try:
+            # repo.add_collaborator() only counts HTTP 201 (an invitation was
+            # created) as success, but GitHub answers 204 when the user is
+            # already a collaborator or is an org member who gets access
+            # directly -- which reported every student who already had access
+            # as a failure. The github3.py fork we used to depend on checked
+            # for 204 instead, so accept both. A 404 is still a real failure,
+            # e.g. there is no such user on this server.
+            url = repo._build_url("collaborators", str(user), base_url=repo._api)
+            response = repo._put(url, data=json.dumps({"permission": permission}))
+            if response.status_code >= 400 and response.status_code != 404:
+                raise github3.exceptions.error_for(response)
+            output = response.status_code in (201, 204)
+        except GitHubError as error:
+            ...
+```
+
+Net effect of the second commit: **+15 / −24**. Fewer lines, one function
+instead of two, and no behaviour change — the same run produced an identical
+153 added / 14 failed / 167 issues skipped.
+
+## The Lesson
+
+**What Claude got right:**
+The hard part, which was the diagnosis. The 201-vs-204 mismatch is not
+guessable; it was found by diffing an abandoned fork against its upstream base
+and then confirmed with live calls that showed a 204 for an existing
+collaborator and a genuine 404 for a non-member. The fix *logic* — accept both
+codes, still fail on 404, still raise on other 4xx/5xx — survived the refactor
+completely unchanged. Only its address changed. Claude also verified against
+the real system instead of asserting success, and distinguished the 151 false
+alarms from 16 genuine failures rather than reporting "all fixed."
+
+**What required human expertise:**
+Knowing the shape of your own codebase. `_add_collaborator` was already the
+wrapper for exactly this operation, so there was a correct home for the change
+and Claude built a second one next door. This is cheap knowledge for the person
+who wrote the file and expensive for anyone else — which is precisely the kind
+of thing a human reviewer should expect to supply.
+
+**Why Claude missed it:**
+
+1. *Mirroring the library instead of the codebase.* The fix was a replacement
+   for `repo.add_collaborator(...)`, so Claude wrote a drop-in with the same
+   name and nearly the same signature. That is the right instinct when you are
+   patching a library and the wrong frame when the project already owns a
+   wrapper around that library call. The new function was shaped by its
+   ancestor rather than by its use.
+
+2. *An edge case drove the main design.* Of three call sites, one — operating
+   on a *fork* of a repo — genuinely could not use `_add_collaborator`, because
+   that method looks the repo up in `self.repos` and a fork is not there. That
+   real constraint made a standalone function feel necessary. But that call
+   site **discards the return value**, so the 201-vs-204 distinction, the whole
+   point of the fix, never mattered there. Claude let the one site that did not
+   need the fix determine the shape of the fix.
+
+3. *Reading code to find a call site is not reading it to find a home.*
+   `_add_collaborator` was on screen; Claude had opened it specifically to find
+   the line to rewire. It got filed as "a caller to update" rather than "the
+   place this logic goes." Same text, different question, and Claude only asked
+   the narrow one.
+
+4. *The name collision never registered.* `add_collaborator` beside
+   `_add_collaborator` is a code smell visible at a glance, but Claude picked
+   the name by matching the library method it was replacing and never checked it
+   against the names already in the file.
+
+There is a tell that the split was wrong, sitting in the helper itself: the
+`if not username: return False` guard was dead code. It was inherited from the
+library's implementation, but the only caller, `_add_collaborator`, cannot pass
+an empty user. A function carrying a guard its sole caller makes impossible is
+a function that was copied into existence rather than designed for its job.
+
+**Key takeaway:**
+Before writing a function that wraps a library call, grep for the wrapper your
+codebase already has around that call — the fix usually belongs inside it. If
+the name you are about to define is one character away from a name already in
+the file, stop: that is not a naming problem, it is a sign you are duplicating
+an abstraction that exists.
+
+## Postscript: keeping the mistake on purpose
+
+The second correction was not a correction at all. Asking for the wrong version
+to be committed *first*, so that the refactor exists as its own diff, treats the
+error as material rather than as something to erase before anyone sees it. The
+useful artifact is not the final code — it is the `+15 / −24` between two
+commits, which shows that the better version is also the smaller one.

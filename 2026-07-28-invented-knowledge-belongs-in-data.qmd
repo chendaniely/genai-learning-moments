@@ -1,0 +1,155 @@
+---
+title: "Learning Moment: Invented Knowledge Belongs in Data, Not Code"
+date: 2026-07-28
+categories: [claude, learning, ai-collaboration]
+---
+
+## Context
+
+Designing a new feature for *Iro 色*, a website for exploring the 348 color
+combinations in Sanzo Wada's *A Dictionary of Color Combinations*. The project is
+deliberately "vibe-coded": the owner does not read JavaScript, TypeScript, HTML
+or CSS, and Claude is the sole maintainer of the code.
+
+The feature under design lets a visitor photograph their face and get back the
+book colors that suit their skin tone. Two palettes were to be produced: one
+derived from measurements of the photograph by stated geometric rules, and one
+from the traditional twelve-season system of personal color analysis
+("Deep Autumn", "Cool Summer", and so on).
+
+## The Initial Ask
+
+The owner wanted the traditional seasonal output alongside the measured one, so
+that the result would be useful to someone who had already paid for a
+professional color analysis:
+
+> but i would like it to still try to guage the person's 12-color summary. this
+> way it's still usable with someone who has done an official color analysis.
+> either that or we provide both ways.
+
+## Claude's Initial Response
+
+Claude specced the season palettes as a TypeScript module, `src/color/seasons.ts`,
+described in the architecture table as *"The twelve regions, the classifier, and
+the per-season filter."* Each season would own a hard-coded target region — a hue
+range, a lightness range and a chroma range — and the book's colors falling
+inside that region would form that season's list.
+
+Claude did flag the honesty problem, prominently and unprompted. The spec said:
+
+> **These twelve regions have no published source. They are our invention.** That
+> is a real cost of shipping this palette, and it is not to be papered over.
+
+and required disclosure text on the result page and in the site's About section
+stating that the measured palette came from the visitor's face while the season
+palette came from a table we wrote.
+
+Claude had also demonstrated the weakness concretely: running both methods over
+the real 157-color dataset showed they agreed on only 9 colors for one test
+persona and 8 for another, and Claude's own season classifier put a light, cool,
+high-contrast face in "Clear Winter" — a classification a real analyst would
+likely dispute.
+
+So the problem was identified, measured, and disclosed. It was still in the
+wrong place.
+
+## The Exchange
+
+**Turn 1 — User:**
+
+> maybe we create a separate dataset that maps color to season. this way i can
+> easily change it or have another agent analyze it. and it'll update in the
+> website.
+
+**Turn 1 — Claude:**
+
+Claude recognised this as strictly better than the specced approach and
+restructured the design:
+
+- The mapping moved to `data/curated/seasons.json`, hand-editable and read
+  directly by the app — edit the file, refresh the page, palettes change.
+- `src/color/seasons.ts` became `src/core/seasons.ts`. With the palettes stored
+  as data, no color science remained in the module, so it belonged in the
+  project's dependency-free kernel rather than in the layer that may use color
+  libraries.
+- Membership became many-to-many, since a color can legitimately belong to
+  several seasons.
+- Classification stayed in code, because it is *derived from measurement*;
+  membership became data, because it is *curated*. Naming that split made both
+  halves easier to defend.
+- The file is seeded once by a script from the original region math, then owned
+  by hand — the script stays available for regeneration but is not part of the
+  build.
+- A validation test was added covering schema, resolvable color ids, twelve
+  unique seasons, no empty palettes, and total coverage of the classifier's
+  output space. A file *meant* to be edited needs that guard more than generated
+  data does.
+
+Claude also noted that this amended a standing architecture rule in the project's
+`CLAUDE.md`, which said the app reads only one data file. The amendment preserved
+the distinction the rule actually protected: `data/processed/` is generated from a
+vendored source and must never be hand-edited; `data/curated/` is authored by
+hand and never generated.
+
+## The Final Solution
+
+```json
+{
+  "schemaVersion": 1,
+  "note": "Hand-curated. No published source — see the spec.",
+  "seasons": [
+    {
+      "id": "deep-autumn",
+      "name": "Deep Autumn",
+      "undertone": "warm", "depth": "deep", "chroma": "clear",
+      "colorIds": [12, 44, 91]
+    }
+  ]
+}
+```
+
+The part of the system that Claude had correctly identified as invented became
+the part that is easiest to inspect, diff, review and correct — auditable against
+published sources by someone who cannot read TypeScript, or by a different agent
+pointed at a single JSON file.
+
+## The Lesson
+
+**What Claude got right:**
+
+Claude identified the epistemic problem without being asked, quantified it by
+running both methods over the real dataset, showed the owner the disagreement
+rather than describing it, and volunteered a mitigation. It also correctly
+separated classification (derived from measurement) from membership (curated) —
+that distinction survived into the final design.
+
+**What required human expertise:**
+
+The owner recognised that the *form* invented knowledge takes determines *who is
+able to correct it later*. As a JSON file, twelve dubious lists can be audited by
+a domain expert, diffed in a pull request, or handed to another agent with a
+narrow, checkable task. As constants inside a TypeScript module, the same
+knowledge is frozen behind whoever can safely edit the code — which, in this
+project, is Claude and no one else.
+
+**Why Claude missed it:**
+
+Claude treated "invented, with no published source" as a **disclosure** problem
+and solved it with honest wording. The owner saw it as an **architecture**
+problem and solved it by changing who holds the pen.
+
+Two structural reasons for the gap. First, Claude optimised for the constraint it
+had been given — be honest about provenance — and stopped once that constraint
+was satisfied, rather than asking what *else* follows from a component being
+guesswork. Second, constants-in-a-module is an unremarkable default in most
+codebases, and Claude applied it without weighing the one fact that made it wrong
+here: the owner does not read code. In a project where the maintainer cannot edit
+TypeScript, expressing revisable knowledge *as* TypeScript makes it unrevisable
+by the only person with the standing to revise it. Claude knew that fact about
+the project and still failed to apply it to this decision.
+
+**Key takeaway:**
+
+When you admit that part of a system is guesswork, ask who will need to correct
+it later and whether they can — the answer, not tidiness, should decide whether
+that knowledge lives in code or in data.

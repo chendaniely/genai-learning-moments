@@ -1,0 +1,255 @@
+---
+title: "Learning Moment: Install the Dependency, Don't Borrow a Copy of It"
+date: 2026-08-17
+categories: [claude, learning, ai-collaboration]
+---
+
+## Context
+
+The UBC MDS install guides for the incoming cohort — around 100 students across macOS,
+Windows and Ubuntu — and the `check-setup-mds.sh` script students run to prove their
+install works.
+
+The stack had recently migrated from conda to `uv` for Python. While testing that PDF
+rendering worked across all three routes students actually use — `quarto render`,
+`rmarkdown::render()`, and `jupyter nbconvert` — renders from a plain terminal began
+failing with `pandoc … not found`. I framed this as pandoc having become a hard
+requirement of the new uv-based stack.
+
+## The Initial Ask
+
+> "how did the r markdown rendering work in the previous install instructions? pandoc was
+> never really a hard requirement back then. why is it all of a sudden becoming a hard
+> requirement now?"
+
+## Claude's Initial Response
+
+The challenge was correct and my framing was wrong, which I established by testing rather
+than asserting. **pandoc did not become a hard requirement — it was always required, and
+it used to be satisfied twice over.**
+
+Two independent suppliers existed in the conda era:
+
+1. **conda packaged the binary.** Verified against conda-forge: `nbconvert` depends on
+   `nbconvert-pandoc`, which ships the pandoc *binary*. So `conda install jupyterlab …`
+   put pandoc into the auto-activated `base` environment — on `PATH` globally,
+   invisibly, for everything.
+2. **The IDE exported it.** RStudio sets `RSTUDIO_PANDOC` when it launches R, and
+   `rmarkdown` honours it. Verified behaviourally:
+
+   ```
+   bare PATH, no RSTUDIO_PANDOC  → find_pandoc(): version 0   (NOT FOUND)
+   RSTUDIO_PANDOC set            → find_pandoc(): version 3.10
+   ```
+
+Corroborating evidence that the team already knew supplier 2 was load-bearing: the
+conda-era check script hunted for pandoc through eight hard-coded Quarto and RStudio bundle
+paths, and its list of required programs contained **no `pandoc` entry at all** — it never
+checked `PATH`, because R got pandoc from a bundle and Python got it from conda.
+
+**What actually changed:** `uv` installs Python wheels, and pandoc is a Haskell binary. uv
+cannot package it the way conda could, so supplier 1 vanished. The guides replaced it with
+a `PATH` line in `~/.bash_profile` pointing at Quarto's bundled copy — **one supplier where
+there had been two**, and that one downstream of a `chsh -s /bin/bash` step with no
+verification anywhere.
+
+Good diagnosis. Then I proposed fixes, and every one of them was downstream of the problem.
+
+## The Exchange
+
+**Turn 1 — User:**
+
+> "can we use uv tool or uvx to install pandoc?"
+
+**Turn 1 — Claude:**
+
+Tested rather than guessed, and the finding was genuinely interesting: `pypandoc_binary`
+does ship a real pandoc (verified: `pandoc 3.9`, runs), with wheels for macOS x86_64 and
+arm64, Linux x86_64/aarch64/musl, and Windows amd64. Then three reasons it does not help:
+
+- **It exposes no `pandoc` command.** Its only console script is `pypandoc`; the binary is
+  buried at `site-packages/pypandoc/files/pandoc`. nbconvert shells out to `pandoc` on
+  `PATH`, so this changes nothing without *another* `PATH` edit — the exact fragility we
+  were trying to remove.
+- **Two pandocs, different versions**, with nothing to tell you which one wins the `PATH`
+  race.
+- **`uv` installed the x86_64 wheel on an arm64 machine**, even though an arm64 wheel
+  exists. A pandoc under Rosetta, on machines where Rosetta may not be installed, is a
+  worse failure than the one we had.
+
+`uvx`/`uv tool` were additionally wrong: they install into an isolated tool environment, not
+the project `.venv`, so `uv run jupyter nbconvert` would not see it. I countered with
+symlinking Quarto's bundled pandoc into `.venv/bin`.
+
+**Turn 2 — User:**
+
+> "can we get away with the current system of having quarto and rstudio installed for
+> pandoc linking?"
+
+**Turn 2 — Claude:**
+
+Tested the student-with-a-broken-`PATH`-edit case directly. (My first attempt at this test
+was broken — `uv` was not on the bare `PATH`, so a failure I read as "pandoc missing" was
+actually "uv not found".) Corrected results:
+
+| route | pandoc source | works without the `PATH` edit? |
+|---|---|---|
+| `quarto render` anywhere | Quarto's own bundle, resolved internally | yes |
+| R inside RStudio | `RSTUDIO_PANDOC` | yes |
+| R inside Positron | `RSTUDIO_PANDOC` | yes |
+| `Rscript` from a terminal / `make` | nothing sets it; `find_pandoc()` → `0` | **no** |
+| `jupyter nbconvert` from a terminal | shells out to `pandoc` on `PATH` | **no** |
+
+Positron turned out to behave identically to RStudio, verified in its own source rather than
+assumed:
+
+```ts
+// Advertise the location of the Pandoc executable.
+if (pandocPath) {
+    collection.replace('RSTUDIO_PANDOC', pandocPath);
+}
+```
+
+Also verified: `quarto render --to pdf` succeeds with no pandoc anywhere on `PATH`, so the
+`PATH` line was never doing anything for Quarto in the first place.
+
+My proposal: a Makefile block that exports `RSTUDIO_PANDOC` from whichever IDE bundle exists
+and prepends that directory to `PATH` for nbconvert. Clever, uses the sanctioned binary at
+the sanctioned version — and fixes exactly one entry point.
+
+**Turn 3 — User:**
+
+> "does that mean we need to set something up in the bash rc file / profile in the […]
+> install instructions for pandoc?"
+
+**Turn 3 — Claude:**
+
+Ran the one test that decides it — does `find_pandoc()` search `PATH` at all?
+
+| | `find_pandoc()` |
+|---|---|
+| pandoc on `PATH`, no env var | **3.10** |
+| `RSTUDIO_PANDOC` set, not on `PATH` | **3.10** |
+| neither | **0** |
+
+Either mechanism suffices, so the `PATH` line was doing real work — and it is the only one
+of the two that also fixes `nbconvert`, which cannot read `RSTUDIO_PANDOC`. I then claimed
+the line was largely dead on macOS, because macOS has defaulted to zsh since 2019 and zsh
+never reads `~/.bash_profile`.
+
+**Turn 4 — User:**
+
+> "the UBC MDS guides on macOS have all students change their default shell to bash (from
+> zsh) so all our students are on the same shell."
+
+**Turn 4 — Claude:**
+
+I had over-generalised from the developer machine I was executing on, which is on zsh. The
+cohort is deliberately standardised on bash, so `~/.bash_profile` *is* read and the design is
+coherent. What survived the correction — and became more important, not less — is that the
+whole macOS chain hangs on `chsh -s /bin/bash` succeeding, nothing verifies it, and it is a
+silent no-op if the student ever set Terminal's "Shells open with: Command". When it does not
+take, the symptom is `MISSING pandoc`, and the guide's troubleshooting note then blames
+Quarto's install location — the wrong diagnosis. Because every student is *meant* to take
+that step, an unverified `chsh` is a single point of failure for the whole cohort's PDF
+export, not an edge case.
+
+**Turn 5 — User:**
+
+> "do you think i should just add a section to the install guide to go to the pandoc site
+> and install it? macs have the .pkg file and windows have the msi files. i'm assuming this
+> will be an easier install for students and also add it to the PATH?"
+
+**Turn 5 — Claude:**
+
+The pandoc site is vague about macOS `PATH`, which is the part that mattered, so I inspected
+the `.pkg` payload without installing it. It lands at **`/usr/local/bin/pandoc`**, and
+`/usr/local/bin` is the **first** entry in `/etc/paths` — on `PATH` for every shell, bash or
+zsh, login or not, with no shell-config edit at all. The Windows `.msi` updates `PATH`
+itself.
+
+And then the argument that actually settled it, which only became visible once the proposal
+was on the table: **JupyterLab's `File > Save and Export Notebook As... > PDF`** runs
+nbconvert inside the server process, inheriting the environment `jupyter lab` was launched
+from. If the `PATH` edit did not take, that route breaks — and no Makefile, wrapper, or
+symlink written in the project repo can reach it. A system-installed pandoc fixes every
+route at once.
+
+## The Final Solution
+
+Add a pandoc install section to the install guides for all three operating systems, pointing
+at the official installers, and drop the borrowed-copy `PATH` line.
+
+| | before | after |
+|---|---|---|
+| supplier | Quarto's bundle via a `~/.bash_profile` line | system `/usr/local/bin` |
+| depends on `chsh` succeeding | **yes** | no |
+| depends on a shell-config edit | **yes** | no |
+| works in JupyterLab's PDF export | only if both of the above held | yes |
+
+Details that came out of verifying it rather than assuming:
+
+- **Removing the `PATH` line is safe, but check first.** It pointed at Quarto's `tools`
+  directory, which also holds `dart-sass`, `deno`, `esbuild` and `typst`. Grepping the guides
+  confirmed pandoc was the only consumer; the rest are Quarto-internal.
+- **Order the change.** Add the install step, verify it, *then* remove the `PATH` line. One
+  combined commit leaves anyone mid-install in a window where neither is in place.
+- **Students will now have four pandocs** — system 3.10.2, Quarto's bundle, RStudio's 3.10,
+  Positron's 3.10. Harmless: Quarto uses its own regardless, and `rmarkdown`/`nbconvert` take
+  the system one. But sample outputs in the guides showing `3.8.3` need updating.
+- **The version check needed care.** Requiring exactly `3.10.` would create the same
+  expiring-regex problem we had already flagged elsewhere, so I widened it to an
+  alternation — which promptly matched the substring `8.3` inside `pandoc 3.8.3` and passed
+  a version that should have failed. Anchoring the alternation to a leading space fixed it,
+  and because that space is word-split away the success line still reads
+  `OK        pandoc 3.10.2`.
+
+## The Lesson
+
+**What Claude got right:**
+
+The forensics, and the discipline behind them. I reconstructed a two-supplier dependency
+chain, verified each link by execution rather than by recall — conda-forge metadata for
+`nbconvert-pandoc`, `find_pandoc()` return values under three different environments,
+Positron's own source for `RSTUDIO_PANDOC`, the `.pkg` payload, `/etc/paths` ordering — and
+identified precisely which link had broken and when. I also caught several of my own bad
+tests along the way: a stale PDF that made a failing render look like a pass, a shell-quoting
+bug that turned a false negative into "evidence", and a broken bare-`PATH` test that
+misattributed a missing `uv` to a missing pandoc. The diagnosis was right and it was earned.
+
+**What required human expertise:**
+
+Asking whether the arrangement needed to exist. Every fix I proposed — exporting
+`RSTUDIO_PANDOC` from an IDE bundle, installing a PyPI shim, symlinking into `.venv/bin` —
+accepted the existing strategy of *borrowing* a pandoc that some other tool had already
+installed, and tried only to make the borrowing more reliable. The user's answer was
+upstream and simpler: install the dependency the way its authors distribute it.
+
+It also took knowledge of how students actually use the tools. The decisive argument was
+JupyterLab's GUI export menu — a route that exists in the product, is the one many students
+will reach for first, and is unreachable from anything in the project repo. I was optimising
+for `make`, because `make` was what was failing in front of me.
+
+**Why Claude missed it:**
+
+Two structural reasons.
+
+The first is that I **inherited a constraint from the guides without ever testing it**. The
+existing docs were built around not installing a second copy of pandoc, and I absorbed that
+as a given. I characterised in great detail *why* the current arrangement was fragile without
+once asking whether the arrangement itself was necessary. Verifying a system thoroughly is
+not the same as questioning its premise, and being thorough inside the wrong frame is a very
+convincing way to stay there.
+
+The second is a **cheap-cleverness bias**. I preferred solutions that added no install step,
+because an extra step reads as a cost — and a wrapper that fixes things "for free" feels
+elegant. For a cohort of around 100 students, one GUI installer that works identically on
+every route beats a shell-config edit that is downstream of an unverified step and invisible
+when it fails. The elegant fix was cheaper for me to write and more expensive for them to
+depend on.
+
+**Key takeaway:**
+
+When you find yourself making a workaround more robust, check whether the thing being worked
+around is required — the fix that removes a dependency chain usually beats the one that
+reinforces it.

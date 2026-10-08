@@ -1,0 +1,226 @@
+---
+title: "Learning Moment: When the Harness Lies, It Lies Plausibly"
+date: 2026-08-17
+categories: [claude, learning, ai-collaboration]
+---
+
+## Context
+
+`mds-setup-check` is the repository UBC MDS students clone in their first week to confirm
+their machine can turn a source document into a PDF. It holds a Quarto document, a Jupyter
+notebook and an R Markdown document, and renders each of them through four routes — LaTeX,
+Typst, pandoc and a headless browser. Auditing it means running renders, extracting text
+back out of the results, and reading git history to find out how the toolchain used to
+behave.
+
+This note is different from the others in this collection. There is no user correction in
+it. It is a pattern Claude caught in itself, four times in one session, while doing that
+audit — and a fifth time only after the bug had shipped.
+
+The user was present throughout and every one of these was self-caught, which is exactly
+the point. Each was caught because a result happened to be checked against an expectation.
+Not one of them announced itself. Every single one would otherwise have become a
+confidently stated wrong conclusion, delivered with a command transcript underneath it as
+evidence.
+
+## The Initial Ask
+
+The question that produced two of the four:
+
+> "how did the r markdown rendering work in the previous install instructions? pandoc was
+> never really a hard requirement back then. why is it all of a sudden becoming a hard
+> requirement now?"
+
+A good question with a checkable answer: render an R Markdown file under the conditions in
+question, and read the historical install guides to see what they told students to
+install.
+
+## Claude's Initial Response
+
+The method was right. Build a minimal fixture, render it by each route, extract the text
+back out of the output, and separately walk the git history of the install guide grepping
+for `pandoc`. Everything measured, nothing reasoned from documentation.
+
+What Claude did not do at any point was ask whether the measuring apparatus worked. A
+command ran, output appeared, the output was read as a fact about the world. The gap
+between "the tool reported X" and "X is true" was never opened, because nothing forced it
+open — the harness never errored. It produced plausible output instead.
+
+## The Exchange
+
+There are no user turns here. These are the four, in the order they happened.
+
+**Failure 1 — a stale artifact read as a fresh pass.**
+
+Testing whether R Markdown could render LaTeX math, Claude ran the render, then extracted
+text from `m.pdf` and reported that the math had typeset correctly.
+
+The render had failed:
+
+```
+pandoc version 1.12.3 or higher is required and was not found
+```
+
+`m.pdf` was left over from an earlier, successful run through a *different* engine. The
+file existed, it was a real PDF, it contained real typeset math, and it had nothing to do
+with the command that had just run. A stale PDF and a fresh PDF are the same file to
+anyone reading its text.
+
+*The fix:* delete the output before every route, never after. A cleanup step at the end
+protects the next run only if the current run reaches the end.
+
+**Failure 2 — the harness corrupting the input under test.**
+
+The fixture for that same test was generated with `echo "$BODY" > m.Rmd`. In zsh the `echo`
+builtin interprets backslash escapes, so `$\alpha$` in the body became `$lpha$` with an
+embedded bell character — the `\a` had been eaten and replaced with U+0007.
+
+LaTeX then failed with:
+
+```
+! Text line contains an invalid character.
+```
+
+Which reads exactly like a finding. The document under test contains a character LaTeX
+cannot handle — that is the *shape* of the bug the audit was looking for. It was a defect
+in the fixture generator, being reported as a defect in the toolchain.
+
+*The fix:* write fixtures with a quoted heredoc, never `echo`. And after writing a test
+document, grep it for the content it is supposed to contain.
+
+**Failure 3 — a shell-quoting bug silently emptying every query.**
+
+To find out whether the historical install guides had ever mentioned pandoc, Claude walked
+the commits with:
+
+```bash
+git show "$PREV:content/resources_pages/installation_instructions.md" | grep -ci pandoc
+```
+
+zsh reads `:c` as a history-style modifier on the parameter, so `$PREV:c` was consumed as
+`$PREV` plus a modifier, and the argument that reached git was
+`4b81f0eontent/resources_pages/installation_instructions.md`. Every revision returned `0`.
+
+Claude's first reading of four consecutive zeroes was "the guides never mentioned pandoc" —
+which happened to be the answer the question was fishing for. `git show` had in fact
+errored on every call, but its complaint went to stderr while the pipeline dutifully
+printed a number, and a number is what was being read.
+
+*The fix:* `"${PREV}:path"`, and treat a uniformly negative result as suspicious. Four
+zeroes is either a finding or a broken command, and the broken command is more likely.
+
+**Failure 4 — an `&&` chain half-succeeding.**
+
+```bash
+git checkout main && git pull
+git checkout -b feat/pandoc-version-check
+```
+
+The checkout failed on uncommitted changes, so the pull never ran — the `&&` did its job.
+But the *next line* ran anyway, and branched from a stale `main` carrying an unrelated
+uncommitted edit. `&&` guards the command after it, not the rest of the script.
+
+Caught before pushing, and the recovery was ordinary: save the diff as a patch, commit the
+unrelated change where it actually belonged, re-branch from an updated `main`, re-apply.
+The failure mode is what matters. A half-run chain still leaves you on a branch. It is just
+not the branch you think you are on.
+
+**A fifth, different in kind — a live regression, caught only after it shipped.**
+
+The other four wasted Claude's own time. This one reached a student-facing script. A
+version check for pandoc was added to `check-setup-mds.sh` as:
+
+```bash
+pandoc="(^| )(3\.(1[0-9]|[2-9][0-9])|[4-9]\.[0-9]+|...)"
+```
+
+The pattern contains a literal space, in the `(^| )` that anchors the version to a word
+boundary — and the array holding it was expanded unquoted, `for sys_prog in ${sys_progs[@]}`.
+The entry split in half. The check ran against `pandoc=(^|` and the live log said so:
+
+```
+MISSING   pandoc=(^|
+```
+
+for a machine whose pandoc status was never actually determined. The fix was
+`(^|[[:space:]])`, which matches identically and contains no literal space, plus
+`"${sys_progs[@]}"` so no future entry can split the same way.
+
+Worth recording alongside it: quoting the loop does **not** fix the related globbing
+problem. `sys_progs=(R=4.* ...)` expands its globs at assignment time, so a file named
+`R=4.txt` in the working directory still rewrites that entry no matter how carefully the
+array is expanded later.
+
+**What the five have in common.**
+
+In every case the harness failed in a way that produced plausible output rather than an
+error. A stale PDF reads exactly like a fresh one. A zero grep count reads exactly like a
+real absence. A half-run `&&` chain leaves you on a branch. A split array entry produces a
+check result, in the right column, in the right format. None of these raise. They all
+return something a reasonable person would read as an answer.
+
+## The Final Solution
+
+Four practices, each drawn from what actually caught one of the above:
+
+- **Delete the output before the test, not after.** Any check for a file's existence or
+  contents is invalid if a previous run could have left one behind. `make clean` removes
+  every rendered PDF, HTML file and LaTeX intermediate, and it is run *before* a route, not
+  as tidying afterwards.
+- **A uniformly negative result deserves the same scrutiny as a positive one.** Zero hits
+  across every revision is a claim about the world *or* a broken command, and the second
+  hypothesis is cheaper to test.
+- **Assert that the harness can fail before trusting what it reports.** `ci/assert-renders.py`
+  and `ci/assert-contract.py` were both checked against deliberate breakage — removing a
+  dependency from `pyproject.toml`, deleting a word from a rendered file — to confirm they
+  could go red at all. `assert-renders.py` also carries negative expectations: routes known
+  not to support a character assert that it is *absent*, so a future fix shows up as a
+  failing test rather than being absorbed unnoticed.
+- **Verify the fixture is what you think it is.** After writing a test document, grep it for
+  the content it is supposed to contain, before drawing any conclusion from how it renders.
+
+## The Lesson
+
+**What Claude got right:**
+
+It caught all four itself, before any of them reached a conclusion the user acted on, and
+it caught the fifth from a single odd-looking line in a real log. That is worth stating
+plainly rather than as false modesty — the audit was run by executing things and reading
+what came back, which is the only reason there was anything to notice. Reasoning about the
+toolchain from documentation would have produced none of these errors and none of the
+findings either.
+
+**What required human expertise:**
+
+Almost nothing, and that is the unusual part of this note. What it required instead is a
+habit that is normally supplied by an experienced engineer: the reflex to distrust an
+answer that arrives too neatly. The user's question — "pandoc was never really a hard
+requirement back then" — carried a hypothesis, and the broken grep returned exactly the
+evidence that hypothesis predicted. An experienced reviewer feels that as a warning. Claude
+felt it as confirmation.
+
+**Why Claude missed it:**
+
+The harness is invisible infrastructure. Claude's attention was on the *subject* of each
+test — does LaTeX render math, did the guides mention pandoc — and the commands were
+treated as a transparent window onto that subject rather than as code that can be wrong.
+Every one of these five is a bug in code Claude wrote; none of them is in the system under
+test.
+
+That inversion is structural rather than accidental. The task is to produce an answer, and
+plausible output satisfies that goal completely. Nothing in a stale PDF or a zero grep
+count signals "stop" — they are indistinguishable from success, which means the normal
+error-driven correction loop never fires. It fires on exceptions, and none of these threw
+one. Add that shell semantics differ in ways that are silent by design — zsh's `echo`
+interpreting escapes, zsh's `:c` modifier, word splitting on unquoted arrays — and the
+result is a class of failure that is both easy to write and structurally hard to notice.
+
+The honest summary is that these were caught by luck of noticing an oddity, not by a
+systematic guard. The distance between "I noticed that number looked wrong" and "this
+harness cannot silently pass" is the whole lesson.
+
+**Key takeaway:**
+
+Before you believe what a test tells you, prove the test can fail — delete the output
+first, break something on purpose to watch it go red, and treat a clean negative result as
+a bug in your command until you have shown otherwise.

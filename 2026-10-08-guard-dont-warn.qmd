@@ -1,0 +1,138 @@
+---
+title: "Learning Moment: Guard, Don't Warn"
+date: 2026-10-08
+categories: [claude, learning, ai-collaboration, git, security]
+---
+
+## Context
+
+The project was a self-hosted web app (`myapp`) that had been built privately on a local branch.
+It was about to be published as a public GitHub repository.
+Before publishing, Claude ran a privacy audit of every commit.
+The audit found home-network hostnames, hardware details, and employer, conference and course names
+in the spec, the mockups and some commit messages.
+(The project's name and file paths in this note, including in quotes, are placeholders.)
+
+To remove them, Claude rewrote the git history with `git filter-repo`.
+Rewriting history is hard to undo, so first Claude saved the original, unscrubbed history
+as a git bundle (one file holding the whole repository).
+The bundle went *outside* the repo:
+
+```bash
+git bundle create ~/backups/myapp-pre-public.bundle --all
+```
+
+The rewritten history passed every check, was pushed, and the repo was made public.
+
+## The Initial Ask
+
+Dictated; speech-to-text errors such as "get" for "git" are corrected:
+
+> "let's make sure that there's nothing private in my git commit history and the actual
+> codebase that will make it up into the repository and then let's make the remote
+> repository public"
+
+## Claude's Initial Response
+
+Claude did the audit, the history rewrite, the push, and the switch to public.
+Its summary listed the follow-ups. One of them was the backup:
+
+> **Backup:** your full original history, with the private details, is in
+> `~/backups/myapp-pre-public.bundle`. Keep it local and never push it.
+> Delete it once you're sure you won't need the old history.
+
+Claude had just spent the whole task hunting for files that must never be published.
+The audit had even found gaps in `.gitignore`, and Claude had fixed them.
+Yet this new file, the one that holds all the private history, got a sentence in chat.
+It got no rule.
+
+## The Exchange
+
+**Turn 1 — User** (dictated):
+
+> "can you make sure those files that should never be pushed [have a] gitignore file
+> associated with it"
+
+**Turn 1 — Claude:**
+
+Claude checked where each file actually sat and what could catch it:
+
+1. **The bundle's folder:** `~/backups` is not itself a git repo, so the bundle couldn't be
+   pushed from where it was. But nothing would stop it being committed if it were ever copied
+   or moved into a repo.
+2. **The repo's local-only files:** Claude listed every ignored and untracked file in the repo,
+   then tested each "never push" pattern against made-up paths:
+
+   ```bash
+   for f in config.toml packages/x/config.toml docker/deploy.env .env docker/.env \
+            secrets/token.txt .claude/settings.json myapp-pre-public.bundle; do
+     git check-ignore -q --no-index "$f" && echo "ignored     $f" || echo "NOT IGNORED $f"
+   done
+   ```
+
+   Every pattern was ignored except one: `NOT IGNORED myapp-pre-public.bundle`.
+3. **Two rules, two scopes:**
+   - `*.bundle` in the repo's `.gitignore`, for a bundle that ever lands inside this repo.
+   - `*.bundle` in the user's global git ignore file (`~/.config/git/ignore`). That is the
+     ignore file that applies to a file living outside any repo, and it covers every repo
+     on the machine.
+4. **The proof:** a throwaway repo showed the global rule catching a bundle it had never seen:
+
+   ```
+   ~/.config/git/ignore:3:*.bundle	x.bundle
+   ```
+
+## The Final Solution
+
+The never-push rule now lives where git enforces it, not in the chat log:
+
+```gitignore
+# myapp/.gitignore
+# Git bundles (such as the pre-public history backup) can carry private history.
+*.bundle
+```
+
+```gitignore
+# ~/.config/git/ignore
+# Git bundles are full-history backups and may hold private data: never commit one.
+*.bundle
+```
+
+The repo already had rules for its other local-only files: `config.toml`, `.env*`,
+`secrets/`, the deploy values and the agent workspace.
+All of them were tested with `git check-ignore`, not assumed.
+
+## The Lesson
+
+**What Claude got right:**
+
+- **A backup before rewriting.** Making a full backup before an irreversible rewrite is good
+  practice. Keeping it outside the repo was the right call too.
+- **An honest warning.** The warning was accurate: it named the file, said it held private
+  data, and said never to push it.
+- **Thorough elsewhere.** For files that already existed, Claude was thorough: the audit
+  found and fixed `.gitignore` gaps before anything was published.
+
+**What required human expertise:**
+
+The user saw that a warning is a control that depends on a person remembering it, perhaps
+months later, perhaps while tired. A rule doesn't depend on anyone. Asking for the
+`.gitignore` turned "please be careful" into "git will refuse to be careless". It is the same
+instinct as putting a guard on a saw rather than a sign saying "mind your fingers".
+
+**Why Claude missed it:**
+
+- **It was created after the audit.** The bundle didn't exist when the audit ran. Claude made
+  it partway through the cleanup, as a means to an end, and never put the new file through
+  the same "can this be published?" test it had just used on everything else.
+- **Telling felt like finishing.** Writing "never push it" felt like completing the safety
+  step. Claude stated the constraint instead of enforcing it, even though it had the tools
+  to enforce it.
+- **No repo rule seemed to apply.** The bundle sat outside the repo, so a repo `.gitignore`
+  looked irrelevant. The user's global ignore file is the place that covers a file with no
+  repo of its own.
+
+**Key takeaway:**
+
+When an AI tells you "never commit this file", ask it to make committing the file
+impossible. A tested rule in `.gitignore` beats a warning in chat.

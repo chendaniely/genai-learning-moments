@@ -1,0 +1,205 @@
+---
+title: "Learning Moment: A Summary That Quoted the Post and Still Got It Wrong"
+date: 2026-10-07
+categories: [claude, learning, ai-collaboration]
+---
+
+## Context
+
+An instructor had just finished the second post in a blog series about using AI in their teaching.
+The post covers 2 courses:
+a computing course in a data science master's program
+(called "the master's course" below),
+and a health data science course with no coding prerequisites
+("the health course").
+Its argument is that there are 2 things students should get out of AI in class:
+using AI to learn something,
+and doing stuff to learn the AI.
+
+For the first post, the instructor had kept a local planning file of social media drafts.
+For this one they wanted the same thing.
+
+Course codes, names and URLs are generalized below;
+the structure of the exchange is unchanged.
+
+## The Initial Ask
+
+> "ok just like my previous post. let's create a separate file for socials: linkedin, bluesky, and mastodon. dont'e forget the character counts for each service and some relevant hashtags to get more enguagement"
+
+## Claude's Initial Response
+
+Claude read the first post's social file and copied its layout:
+LinkedIn as a short "teaser" plus a longer "Summary field,"
+then a Bluesky post and a Mastodon post.
+
+The mechanics were careful.
+A script counted every draft exactly,
+using each platform's rules:
+graphemes for Bluesky's 300 limit,
+and 23 characters per link for Mastodon's 500.
+The first Bluesky and Mastodon drafts came in over their limits,
+so Claude trimmed them, recounted, and trimmed again until they fit.
+Hashtags matched each platform's habits,
+like Bluesky's feed tags and CamelCase tags on Mastodon so screen readers can read them.
+
+The content was assembled mostly from sentences lifted out of the post.
+Two of them caused trouble later.
+The LinkedIn summary covered the health course
+and then went straight into:
+
+> "But you still need to know what your tools can do. One student had ChatGPT rewrite all of the CSS on their Quarto slides, when the fix was a one or two liner: Quarto's built-in .smaller class."
+
+And all 3 posts ended on the post's own line about vibe coding,
+which Bluesky's limit shortened even further:
+
+> "Fine for me to vibe code without knowing CSS. Not for a student learning Quarto."
+
+The link to the post sat at the end of the teaser.
+The fact that this was part 2 of a series got one secondary line.
+
+## The Exchange
+
+**Turn 1 — User:**
+
+> "please just give me the copy/linked in sectionpaste for linked in i'm not sure why there are like 3 sections for the"
+
+**Turn 1 — Claude:**
+Merged the teaser and summary into one paste-ready LinkedIn post,
+replaced the 3 LinkedIn sections in the file with it,
+and explained that the layout had been copied from the first post's file.
+In the merge, the link moved to near the bottom.
+
+**Turn 2 — User:**
+
+> "in the linked in: "One student had ChatGPT rewrite all of the CSS on their Quarto slides" makes it seem like it's still from [the health course]. when that happened in [the master's course]"
+
+**Turn 2 — Claude:**
+Added the course name to the sentence:
+"In [the master's course], one student had ChatGPT rewrite…"
+
+**Turn 3 — User:**
+
+> "the link to the blog needs to be higher up so it's above the fold"
+
+**Turn 3 — Claude:**
+Moved the link into the opening paragraph, right after the hook,
+so it starts at character 147,
+before LinkedIn cuts the post off with "…see more."
+
+**Turn 4 — User:**
+
+> "i don't like the "Fine for me to vibe code a website without knowing CSS. Not for a student whose homework is learning Quarto." I wanted to read something along the lines of it's fine if you want to do a site project and you learn how to use the tools along the way, but it's not OK when you are vibecoding something that you are actively trying to learn without thinking about it"
+
+**Turn 4 — Claude:**
+Rewrote the line in all 3 posts around that principle,
+for example:
+"It's fine to vibe code a side project and learn the tools along the way.
+It's not OK to vibe code the thing you're actively trying to learn without thinking about it."
+
+**Turn 5 — User:**
+
+> "For LinkedIn and possibly the other social media, I'd like to be able to say that this is the next post in my teaching with AI in the classroom series or incorporating iron [AI] in the classroom series and I think that would be a good follow up for people who saw the first post as well, so I want that Incorporated and rewrite the whole thing so it flows around that framing"
+
+**Turn 5 — Claude:**
+Rewrote all 3 posts as a follow-up.
+Each one now opens with "Part 2 of my … series is up,"
+recaps part 1 in a sentence,
+and points people who missed it back to part 1.
+Turns 2 through 4 were kept,
+and every draft was recounted and trimmed to fit.
+
+## The Final Solution
+
+The LinkedIn post now opens like this
+(URLs are placeholders):
+
+> Part 2 of my Incorporating AI in the Classroom series is up: https://example.github.io/posts/part-2/
+>
+> In part 1, an agent did the typing in my review sessions while the class read and judged its commands. This time I zoom out to the 2 things I want students to get out of AI in class: using AI to learn something, and just doing stuff to learn the AI.
+
+The link starts at character 62.
+The CSS story names its course,
+and the vibe coding line states the principle instead of the instructor-versus-student example.
+The post ends with "If you missed part 1, it's here," plus the link.
+Bluesky (294/300) and Mastodon (465/500, linking both parts) follow the same framing.
+
+## The Lesson
+
+**What Claude got right:**
+Everything that could be measured.
+The counts were exact and used each platform's actual counting rules,
+every draft fit its limit,
+the hashtags matched each platform's habits,
+and the drafts reused the instructor's own wording instead of inventing new claims.
+That last part matters:
+none of the problems came from Claude making things up.
+
+**What required human expertise:**
+Knowing the content, the audience and the platform better than the text did.
+
+- *Who did what, where.*
+  Only the author knew, without rereading,
+  that the CSS story belonged to the other course.
+- *What the argument actually was.*
+  The vibe coding line *was* in the post, nearly word for word.
+  In the post, it comes after the full argument and reads as one example of it.
+  Alone in a social post,
+  "fine for me, not for a student" sounds like a double standard.
+  The author wanted the principle behind the example:
+  side project versus the thing you're trying to learn.
+- *How the platform shows the post.*
+  LinkedIn hides everything below the first few lines,
+  so a link at the bottom is a link most people never see.
+- *Who is reading.*
+  This is part 2.
+  The warmest readers are the people who saw part 1,
+  so "this is the follow-up" is the hook,
+  not a footnote.
+
+**Why Claude missed it:**
+
+1. *Summarizing by lifting sentences.*
+   Claude built the drafts from sentences taken out of the post and reordered.
+   The post introduced the CSS story with a transition that named the course
+   ("The flip side… showed up in [the master's course]").
+   As a summary, that transition looked like filler and got dropped.
+   Once the story sat right after a paragraph about the other course,
+   its position implied the wrong course.
+   Every sentence was accurate, but the arrangement wasn't.
+2. *Matching the text instead of the intent.*
+   Lifting the author's own sentence felt like the safest choice.
+   But a sentence's meaning depends on what's around it.
+   The surroundings changed and the words didn't,
+   so being faithful to the words made it unfaithful to the point.
+3. *The checks measured length, not meaning.*
+   The counting script was the loop Claude used to decide it was done,
+   and it only checks length.
+   When a draft ran over,
+   the cuts came out of the meaning
+   ("2 things" became "what," and "a site" disappeared),
+   because nothing in the loop could notice.
+   Passing that check made the drafts feel finished.
+4. *Each post written as if it stood alone.*
+   Claude knew this was part 2,
+   since the post itself says so in a callout at the top.
+   But Claude treated "part 2" as a fact to mention,
+   not as the main way to reach people.
+   Similarly, Claude knew LinkedIn's 3,000-character limit
+   but didn't think about where LinkedIn cuts a post off.
+   It knew the rules but didn't think about how readers would actually see the post.
+5. *Copying a layout without asking what it was for.*
+   The teaser plus Summary layout was copied from the previous file
+   without anyone checking whether this post needed it.
+   That cost the first correction.
+
+It took 5 turns to fix,
+and the author caught each problem only by reading the drafts as a reader would.
+That's the real cost of these misses:
+they pass every automated check
+and turn up only when a person reads the result.
+
+**Key takeaway:**
+When AI condenses your writing,
+check who did what and where,
+and whether each point still holds up on its own,
+because a summary can quote you exactly and still say something you didn't mean.

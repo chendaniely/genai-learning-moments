@@ -1,0 +1,193 @@
+---
+title: "Learning Moment: The Wrong Engine, Not the Wrong Font"
+date: 2026-08-17
+categories: [claude, learning, ai-collaboration]
+---
+
+## Context
+
+A document-rendering toolchain for UBC MDS. The project carries three fixture documents —
+a Quarto `.qmd`, a Jupyter notebook, and an R Markdown `.Rmd` — and a Makefile that renders
+each one. The point of the fixtures is diagnostic: a student runs `make`, and if the
+documents come out, their toolchain works.
+
+Each fixture contains a line of characters that assignments actually use:
+
+```
+Montréal · naïve · Öl · 5 °C · α β γ · 10 – 20 · "curly quotes"
+```
+
+plus a few emoji in the prose.
+
+Every PDF route went through LaTeX, and every one of them was quietly broken. Quarto to
+`lualatex`, `nbconvert` to `xelatex`, and `rmarkdown` to `xelatex` all **exited 0**, produced
+a PDF, and replaced the emoji and the literal Greek letters with U+FFFD — the replacement
+character. Nine of them per document, in all three routes. Nothing in the exit code, the
+logs, or the file listing said so. You had to open the PDF, or extract its text, to find out.
+
+## The Initial Ask
+
+The report was a bug report with an implied diagnosis already inside it: *the PDFs render,
+but the emoji and Greek letters come out as replacement characters — fix it.*
+
+The framing is accurate as far as it goes. It is also a framing, and the whole lesson here is
+about what it quietly rules out.
+
+## Claude's Initial Response
+
+I took it as a LaTeX font problem and went to work inside that assumption. The work itself
+was reasonable, and some of it was genuinely hard-won:
+
+- Traced how Quarto, `nbconvert` and `rmarkdown` each configure `fontspec`, and confirmed the
+  routes do not even agree on an engine — Quarto's PDF format uses `lualatex`, the other two
+  use `xelatex`.
+- Tested `\setmainfont` variants and found a real portability trap: a *font family name*
+  (`\setmainfont{Latin Modern Math}`) resolves under `lualatex` and **hard-fails** under
+  `xelatex`, which wants a file name unless you hand it `Path=` and an extension. A fix
+  developed against the Quarto route would have broken the other two.
+- Found that when a Greek letter has no text glyph, LaTeX silently falls back to **math
+  mode** — and math mode does not typeset the character you wrote. It emits U+1D6FC
+  MATHEMATICAL ITALIC SMALL ALPHA in place of U+03B1 GREEK SMALL LETTER ALPHA. The PDF
+  *looks* right and greps wrong. That is a subtle finding and it later mattered.
+- Installed three TeX packages to test fixes: `newcomputermodern`, `emoji`, and `noto-emoji`.
+
+That produced a real result. `newcomputermodern` genuinely fixes literal Greek under LaTeX.
+
+It never fixed the emoji. The `emoji` package works through macro syntax —
+`\emoji{check-mark-button}` — so an emoji *typed literally into markdown*, which is the only
+way a student is ever going to write one, still came out as U+FFFD. I had spent a lot of
+effort in a solution space that could not fully solve the problem, and I was still in it.
+
+## The Exchange
+
+**Turn 1 — User:**
+
+> we should also test render to html and pdf. i'm assuming all the characters symbols and
+> emojis render for the html?
+
+**Turn 1 — Claude:**
+
+Correct, and it did two separate things at once.
+
+Adding HTML targets for all three fixtures and extracting the text gave the first
+measurement I had that was not a failure: **0 replacement characters** in all three HTML
+outputs, against **9** in every LaTeX route. Same source files, same characters, same build.
+
+That immediately localised the fault. This was not "Unicode is hard" or "the documents are
+wrong" — it was **specific to LaTeX**, and no amount of font surgery on the source was going
+to be the shape of the answer.
+
+It also named what I had been missing methodologically. I had three routes, all broken, and
+I had been comparing them *to each other*. That tells you which route fails differently, not
+what a working one looks like. A known-good route is a control, and I had one available the
+entire time.
+
+**Turn 2 — User:**
+
+> we should also do the test export using pdf/latex and also pdf/typst
+
+**Turn 2 — Claude:**
+
+Typst is Quarto's other PDF engine. It ships **with Quarto**, needs no LaTeX at all, and is
+one word in the format block.
+
+`quarto render check-quarto.qmd --to typst`: **0 replacement characters.** Emoji, literal
+Greek, accents, dashes, curly quotes and the rendered math, all present. The problem I had
+been partially solving with three TeX packages did not exist on that engine.
+
+One real wrinkle turned up in wiring it in: Quarto treats the LaTeX PDF and the Typst PDF as
+the same output for a given input, so rendering one deleted the other. Both formats need an
+explicit `output-file:` to be named apart.
+
+And there was an uncomfortable second finding. WebPDF — `nbconvert` through headless
+Chromium — also renders everything perfectly, and **I had already run it and seen that
+earlier in the same investigation**. I did not draw the conclusion, because the project's own
+documentation describes WebPDF as the "escape hatch when LaTeX objects to something." I had
+read that line and absorbed its framing: a fallback, not a better route. So a working answer
+sat in my own scroll-back, correctly labelled as working, and I walked past it.
+
+## The Final Solution
+
+The Makefile now has four routes rather than one, each documented by what it can actually
+carry:
+
+```
+#   pdf     LaTeX      accents and math yes; literal Greek and emoji NO
+#   typst   Typst      everything, and no LaTeX involved
+#   html    pandoc     everything
+#   webpdf  Chromium   everything, needs the browser `make install` downloads
+```
+
+And because "it rendered" was exactly the signal that had been lying, `make check` runs
+`ci/assert-renders.py`, which opens the output files and asserts on the extracted text. Each
+route is tagged `LATEX` or `FULL`, and each character check declares which kinds support it:
+
+```python
+CHECKS = [
+    ("accented latin", "Montréal", {LATEX, FULL}),
+    ("degree sign",    "°C",       {LATEX, FULL}),
+    ("en dash",        "–",        {LATEX, FULL}),
+    ("literal Greek",  "α",        {FULL}),
+]
+```
+
+Two properties of that design are the point:
+
+- The LaTeX limitation is **encoded as an expectation**, not hidden. A `FULL` route missing
+  `α` fails; a `LATEX` route that suddenly *gains* it also fails, with the message
+  `this route was not expected to support it; update ci/assert-renders.py`. The known defect
+  cannot silently change in either direction.
+- `FULL` routes additionally fail on any U+FFFD anywhere in the text, which catches dropped
+  glyphs nobody thought to write a check for.
+
+The U+1D6FC discovery from the failed font work earns its keep here: the assertion greps for
+literal `α`, so a route that renders a *mathematical italic alpha* instead is correctly
+counted as not supporting the character, rather than passing on a lookalike.
+
+## The Lesson
+
+**What Claude got right:**
+
+The investigation was real and it was reproducible. The `lualatex`/`xelatex` divergence on
+`\setmainfont` is a genuine portability trap that would have bitten a fix developed against
+one route. The math-mode substitution is subtle, easy to miss, and directly shaped the final
+assertion script. `newcomputermodern` fixing Greek under LaTeX is a true finding. None of the
+work was wrong. It was competent work in a space that could not close.
+
+**What required human expertise:**
+
+Two interventions, and they are different in kind.
+
+The first was **methodological**: get a control. Three failing routes compared to each other
+produce a taxonomy of failures; one working route localises the fault in a single
+measurement. 0 versus 9 said "this is a LaTeX property" faster and more conclusively than any
+amount of font archaeology.
+
+The second was **knowing the problem space has more than one engine in it**. Not deeper LaTeX
+knowledge — the opposite. The knowledge that the LaTeX question was optional.
+
+**Why Claude missed it:**
+
+I accepted the framing and then optimised inside it. "The LaTeX route is broken, fix LaTeX"
+is a well-formed problem with a rich, absorbing solution space — fonts, packages, engines,
+fallback rules — and every hour inside it produced *something*, which is exactly what makes
+it hard to leave. The better question, "is there a different engine?", is not deeper in the
+space. It requires stepping outside the problem as posed, and nothing inside the space
+prompts you to.
+
+Two aggravating details make this worse rather than better. Quarto **ships** Typst — the
+alternative was already installed, and I had listed Quarto's tools directory and seen the
+`typst` binary sitting in it. And WebPDF had already rendered every character correctly in
+front of me; I discounted it because the docs called it an escape hatch, letting a *label*
+about when to reach for something override a *measurement* of what it did.
+
+The general failure is that I treated the boundaries of the stated problem as the boundaries
+of the search. A human with less LaTeX knowledge than me solved it in one sentence, because
+they were not standing inside LaTeX.
+
+**Key takeaway:**
+
+Before optimising inside a broken component, ask two questions the framing will not ask for
+you — *is there a known-good path to compare against?* and *is there another component
+entirely?* — because a control localises the fault in one measurement, and the alternative
+engine is often already installed.

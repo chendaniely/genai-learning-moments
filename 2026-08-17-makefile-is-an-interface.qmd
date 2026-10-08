@@ -1,0 +1,188 @@
+---
+title: "Learning Moment: A Makefile Is an Interface, Not Just a Build Graph"
+date: 2026-08-17
+categories: [claude, learning, ai-collaboration]
+---
+
+## Context
+
+`mds-setup-check` is the small UBC MDS project students clone in their first week to
+verify their software installation. It holds a Quarto document, a Jupyter notebook and an
+R Markdown document, and a `Makefile` that renders them to PDF and HTML through four
+different routes — LaTeX, Typst, pandoc, and a headless browser — because the routes do
+not all handle the same characters.
+
+Three audiences touch that Makefile. A student, on day one, who has probably never run
+`make` before. An instructor or TA, debugging why a particular student's machine cannot
+produce a PDF. And CI, which calls named targets. The repository's own README links the
+three OS-specific MDS installation guides — macOS, Ubuntu and Windows — that send students
+here in the first place.
+
+## The Initial Ask
+
+> "restructure the Makefile around three targets — `all`, `install`, `clean`. `install`
+> installs the packages, `all` renders everything to PDF and HTML, `clean` deletes the
+> outputs."
+
+## Claude's Initial Response
+
+Claude implemented exactly that. `install` ran `uv sync`, downloaded the Chromium that the
+WebPDF route needs, and called `renv::restore(prompt = FALSE)`. `all` depended on the four
+render routes. `clean` removed the PDFs, the HTML, the log files and the LaTeX
+intermediates. The dependency rules were real file rules — `check-quarto.html` depending on
+`check-quarto.qmd` — so `make` would skip work that was already done. Every non-obvious
+decision had a comment above it explaining why.
+
+It was a correct build file, and Claude considered it finished.
+
+`all` was the first target in the file, which meant that typing `make` with no arguments
+started several minutes of rendering, including a browser download on a cold machine.
+Claude did not think of that as a decision at all. It was just where `all` happened to
+land.
+
+## The Exchange
+
+Both corrections arrived in a single message. They are quoted here as the two separate
+requirements they contain, because they failed for different reasons.
+
+**Turn 1 — User:**
+
+> "in the makefile the first target should be commands, and it does a file grep for
+> comments that can give a high level 'help' of the targets and what they do"
+
+**Turn 1 — Claude:**
+
+The first target is not a build decision, it is the answer to the question "what happens
+when someone types `make` and presses enter." For this repository, the person most likely
+to do that is a first-week student who is exploring, and the correct response to
+exploration is a list of what is available — not several minutes of work they did not ask
+for and cannot interpret.
+
+The second half of the requirement was the part that made it maintainable: build the list
+by grepping the file rather than writing it by hand. Each target carries a `## ` comment on
+its own line, and the recipe extracts them, so the help text is derived from the file and
+cannot drift away from what the file actually does.
+
+**Turn 2 — User:**
+
+> "make sure that the grep command used to build the help list works on git bash"
+
+**Turn 2 — Claude:**
+
+Claude had written the recipe without considering which tools it assumed. MDS supports
+macOS, Ubuntu and Windows, and Windows students work in Git Bash, whose MSYS userland is
+not the GNU userland the recipe would get on Ubuntu. Three specific things were ruled out:
+
+- **`grep -P`** — PCRE support is a compile-time option and is absent from a number of
+  builds, so a pattern that needs it fails with `grep: support for the -P option is not
+  compiled into this --disable-perl-regexp binary` rather than producing wrong output.
+- **Lazy quantifiers** — `.*?` is not lazy in POSIX ERE. It parses, it matches greedily,
+  and a target line containing a second colon silently produces a mangled help entry.
+- **`sed -i`** — GNU takes `-i` with no argument, BSD requires a backup suffix. It is not
+  needed here at all, but it is the reflex reach for text munging and it does not port.
+
+What is left is `grep -E`, `sort` and `awk`, all three of which are present in Git Bash on
+Windows as well as on macOS and Linux. Claude verified the recipe against the BSD tools
+that ship with macOS, which are the stricter of the two toolchains and the better proxy for
+MSYS.
+
+## The Final Solution
+
+`commands` is the first target in the file, and its recipe reads the file it lives in:
+
+```make
+.PHONY: commands all install clean check pdf typst html webpdf
+
+# `commands` is first, so a bare `make` prints this list rather than doing work.
+# The list is built from the `##` comments on each target below, so it cannot go
+# stale the way a hand-written help message does. grep -E, sort and awk are all
+# present in Git Bash on Windows as well as on macOS and Linux.
+commands:  ## Show this list of targets
+	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) \
+		| sort \
+		| awk 'BEGIN {FS = ":.*## "}; {printf "  %-10s %s\n", $$1, $$2}'
+```
+
+Each target then documents itself on its own line:
+
+```make
+install:  ## Install the Python and R packages, and the browser for webpdf
+all: pdf typst html webpdf  ## Render every document by every route
+```
+
+A bare `make` now prints:
+
+```
+  all        Render every document by every route
+  check      Check the rendered documents actually contain what they should
+  clean      Delete everything the renders produced
+  commands   Show this list of targets
+  html       Render to HTML
+  install    Install the Python and R packages, and the browser for webpdf
+  pdf        Render to PDF through LaTeX
+  typst      Render to PDF through Typst, which handles emoji and Greek
+  webpdf     Render to PDF through a headless browser
+```
+
+Properties worth naming:
+
+- **It costs nothing and does nothing.** A student who types `make` to see what happens
+  gets an answer in milliseconds and has not started a download.
+- **It cannot go stale.** Adding a target with a `## ` comment adds it to the help. Adding
+  one without a comment omits it, which is the correct default for an internal rule.
+- **`sort` makes the order stable**, so the list does not reshuffle when a target moves.
+- **`$(MAKEFILE_LIST)`** rather than a hard-coded filename, so the recipe survives the file
+  being renamed or included.
+
+## The Lesson
+
+**What Claude got right:**
+
+The build graph itself. The three requested targets were implemented as asked, the file
+dependencies were real rather than `.PHONY` shortcuts, so incremental builds work, and the
+comments explained the non-obvious parts — particularly why the LaTeX PDF and the Typst PDF
+need distinct output names, since Quarto otherwise treats them as the same output and
+rendering one deletes the other. As a description of how to build the project, it was
+right.
+
+**What required human expertise:**
+
+Two things, and they are different in kind.
+
+The first was recognising that **the default target is an interface decision**. Nothing
+about `all`, `install` and `clean` as a set implies which one runs bare, and Make's answer —
+whichever is first — is an implementation detail that becomes the project's front door.
+Knowing that the front door matters here required knowing who walks through it: a student in
+week one, for whom a multi-minute render with no explanation is indistinguishable from the
+program hanging.
+
+The second was **holding the whole supported machine population in view**. "The grep works"
+was true on the machine Claude ran it on. The relevant question was whether it works on
+every machine the installation guides produce, and that population is defined by documents
+outside the Makefile.
+
+**Why Claude missed it:**
+
+Claude optimised for the stated deliverable. Three targets were named, three targets were
+built, and the acceptance criterion Claude applied to itself was "does this build the
+project correctly." Ordering never came up as a question because, within that frame,
+ordering is arbitrary — Make does not care, and the graph is identical either way. The
+frame was too small: the file is not only a set of instructions for Make, it is also the
+first thing a human reads to find out what the project can do, and those two readers want
+different things from the same line of text.
+
+The portability miss has the same shape but a sharper edge, because **the requirement was
+knowable from the repository's own contents**. The README links three OS-specific install
+guides by name at the top of the file. Claude had read that README. It did not connect "this
+project is entered from a Windows guide" to "the recipe I am about to write must run under
+MSYS," because the two facts lived in different tasks. Portability was treated as a property
+to check when someone raises it, rather than a constraint the repository had already
+declared.
+
+**Key takeaway:**
+
+When a Makefile has human readers, the first target is a user-interface decision, not a
+build decision — make a bare `make` explain itself rather than do work, and generate the
+explanation from the file so it cannot drift. And "works on my machine" is a weak standard
+whenever the machine population is already written down somewhere in the repository: read
+the install guides before choosing your shell tools, not after someone reports the failure.

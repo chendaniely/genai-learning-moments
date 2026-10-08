@@ -1,0 +1,186 @@
+---
+title: "Learning Moment: When the Hover Still Twitches, Question the Hit-Test, Not the Event Plumbing"
+date: 2026-07-20
+categories: [claude, learning, ai-collaboration, dataviz, d3]
+---
+
+## Context
+
+Building an interactive visualization of Sanzo Wada's *A Dictionary of Color
+Combinations* — a circular D3 chord diagram where 157 colors sit as arcs
+around a ring and ~1,000 ribbons connect the colors that appear together in
+the book's palettes. Hovering a ribbon or arc is supposed to dim everything
+else so the connection stands out. The whole thing is a static site the owner
+maintains by directing Claude ("vibe-coded" — the owner doesn't read the
+JS/CSS themselves), so the interaction has to *feel* right on the owner's
+screen, which is the one place the automated tests can't see.
+
+A runnable minimal reproduction accompanies this note:
+[`2026-07-20-snap-to-nearest-object-repro.html`](2026-07-20-snap-to-nearest-object-repro.html)
+— a small chord wheel with a toggle between the buggy "exact hit-testing"
+hover and the fixed "snap to nearest" hover. Open it and drag the cursor
+slowly across the lines inside the circle in each mode.
+
+## The Initial Ask
+
+> the wheel flickers a lot when hovering over. sometimes even flickering
+> completely off where no wheel is seen. let's fix the weel hover performance
+> before i'm able to use it in a way for next iteration.
+
+## Claude's Initial Response
+
+Claude ran a systematic root-cause pass and found real problems in the
+original hover code:
+
+- Every one of the ~1,150 ribbon and arc elements had its **own**
+  `mouseenter`/`mouseleave` listener, and each fire ran a full-scene
+  `classed('dimmed', …)` sweep over *all* ribbons and arcs with a 200 ms CSS
+  transition. Crossing the hundreds of tiny paths under the cursor restarted
+  every transition constantly — the flicker.
+- Ribbon hover dimmed the **entire** wheel to near-invisible; since the disc
+  interior is wall-to-wall ribbons, the wheel visually vanished whenever the
+  cursor was inside it — the "flickering completely off."
+- `mix-blend-mode: multiply` on all ~1,000 ribbons piled compositing cost on
+  top.
+
+Claude rebuilt hover with **delegated** listeners (three handlers on the
+wheel group instead of ~1,150), **keyed** state so redundant events are
+no-ops, and dimming driven by one container class plus a small "hot" set
+instead of a full-scene sweep. This genuinely removed most of the flicker.
+But in the process Claude *also dropped ribbon-hover dimming entirely* — an
+over-correction, on the theory that dimming was the culprit.
+
+## The Exchange
+
+**Turn 1 — User:**
+
+> better. but now when i over over one of the lines inside the circle, it
+> doesn't really stand out. before at least the other colors faded out a bit.
+> i liked that behaviour, you can see the color connections
+
+**Turn 1 — Claude:**
+Conceded the over-correction. The flicker's cause had been the event
+thrashing, *not* the dimming concept — and now that hover used keyed
+delegated events (moving between ribbons swaps state directly, never clearing
+then re-dimming), the "connections stand out" behavior was safe to restore.
+Claude brought back ribbon-hover dimming: hovering a ribbon dims the rest of
+the wheel and keeps that ribbon **plus the two arcs it connects** bright.
+
+**Turn 2 — User:**
+
+> let's do another thinking pass about a solution for the color wheel to make
+> it smoother. in the colors only verion (not shades, families, groups) it
+> still gets twitchy when i am hovering over.
+>
+> i think this is because sometimes as you are hovering over the inner lines
+> you rmouse doesn't actually land on anyplace, so it flashes back into the
+> full wheel view. let's have the mouse always snap to the nearest object
+> (line inside or box outside) it hinkt his will help. what do you think? or
+> do you think we need to use a different library?
+
+**Turn 2 — Claude:**
+This diagnosis was the key that Claude's two prior fixes had circled without
+grabbing. Claude confirmed the real root cause: an SVG `<g>` has **no fill of
+its own** — it is only "hovered" when the pointer is literally over one of its
+child shapes. At the Colors level the disc is ~1,000 thin ribbons *with gaps
+between them*, plus a hollow center. Every time the cursor slipped into a gap,
+it was over nothing, the group's `pointerleave` fired, the dim cleared, and
+the wheel snapped back to full view — then the next ribbon re-dimmed it. That
+gap-flash was the residual twitch.
+
+On the library question: no switch needed. Any renderer has the same "cursor
+is in a gap" problem, and D3 *already bundles* `d3-delaunay` for exactly the
+nearest-neighbor lookup the fix requires. Claude implemented the owner's
+instinct directly:
+
+- A transparent backing disc so the pointer is always "within" the wheel and
+  `pointerleave` only fires at the true outer edge — no interior dead zones.
+- Hover resolves by **geometry from the cursor position**, not which path it
+  lands on: outside the inner radius it snaps to the arc at that angle;
+  inside, it snaps to the nearest ribbon via a Delaunay index of points
+  sampled along each ribbon's centerline.
+- Resolution is keyed and throttled to one update per animation frame, so the
+  highlight only changes when the nearest object changes — it glides instead
+  of strobing. Clicks snap the same way (a click in a gap selects the nearest
+  line or box).
+
+## The Final Solution
+
+The before/after, reduced to the essential difference in *what counts as a
+hit*:
+
+**Before — exact hit-testing.** Hover depends on the pointer being over an
+actual shape, so the gaps between shapes are dead zones that fire a clear:
+
+```js
+ribbons
+  .on('mouseenter', function (_e, d) {
+    ribbons.classed('dimmed', r => r !== d)          // touch all ~1000 ribbons
+    arcs.classed('dimmed', (_a, i) => i !== d.source.index && i !== d.target.index)
+  })
+  .on('mouseleave', clearHover)   // fires the moment the cursor enters a gap
+```
+
+**After — snap to nearest.** A backing disc removes the dead zones, and the
+cursor *position* (not the element under it) picks the nearest object:
+
+```js
+g.append('circle').attr('class', 'wheel-hit').attr('r', HIT_R)  // no dead gaps
+
+// build once per render: nearest-ribbon index from centerline samples
+const delaunay = d3.Delaunay.from(centerlineSamples)
+
+g.on('pointermove', (event) => {
+  const [x, y] = d3.pointer(event, gNode)
+  const nearest = Math.hypot(x, y) >= INNER
+    ? arcAtAngle(Math.atan2(x, -y))     // outside the ring: arc by angle
+    : ribbonAt(delaunay.find(x, y))     // inside: nearest ribbon centerline
+  if (nearest.key === hoverKey) return  // keyed → glides, never strobes
+  highlight(nearest)
+})
+g.on('pointerleave', clearHover)        // only at the true outer edge
+```
+
+(One supporting detail: the wheel's decorative tilt moved from a CSS
+`transform` on the `<svg>` onto the SVG group, so `d3.pointer`'s
+`getScreenCTM` math includes it and the pointer-to-angle conversion stays
+exact.)
+
+## The Lesson
+
+**What Claude got right:**
+The systematic debugging was sound and each fix was a real improvement.
+Claude correctly identified the event thrashing (per-element listeners doing
+full-scene sweeps), the pathological whole-wheel dimming, and the blend-mode
+cost — and the delegated, keyed rewrite removed most of the flicker. When the
+owner pushed back on the lost dimming, Claude correctly re-reasoned that the
+dimming was never the problem and restored it safely.
+
+**What required human expertise:**
+The owner's mental model of the *symptom* — "sometimes as you are hovering
+over the inner lines your mouse doesn't actually land on anyplace, so it
+flashes back into the full wheel view." That sentence names the true root
+cause (the cursor falling into gaps between shapes) and the right fix (snap to
+the nearest object so a hit never depends on landing exactly on a shape) in
+one breath. The owner also asked the sharpening meta-question — "or do you
+think we need to use a different library?" — which forced the correct framing:
+this is not a rendering-library problem at all.
+
+**Why Claude missed it:**
+Claude kept optimizing the *mechanism* of hover (how events are attached and
+batched) while never questioning the *model* underneath it: that "hovering"
+means "the pointer is over a shape." In a scene built from ~1,000 thin shapes
+separated by gaps, that assumption is false a large fraction of the time — but
+it's invisible from the code, because the code only describes what happens
+*when* you're over a shape, never what happens in the space between. Claude
+also had no runtime feel for the interaction; the tests all passed, and only a
+human moving a real cursor through the gaps could perceive that the dead space
+between shapes was where the bug lived. So Claude made the existing model
+faster and smoother twice, when the fix was to change the model — from "exact
+hit" to "nearest object."
+
+**Key takeaway:**
+When an interaction still twitches after you've smoothed the event handling,
+question the hit-testing model itself, not just the plumbing — "nearest
+object" beats "exact hit" whenever the target is made of thin shapes and gaps,
+and the person moving the real cursor often sees the gap before you do.

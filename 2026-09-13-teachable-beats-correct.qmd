@@ -1,0 +1,152 @@
+---
+title: "Learning Moment: A Correct Repro That Nobody Can Teach"
+date: 2026-09-13
+categories: [claude, learning, ai-collaboration]
+---
+
+## Context
+
+Writing the Week 3 group lab for a graduate computing course.
+Students are put into groups of three or four,
+share one Quarto reveal.js slide deck,
+and all edit the same file at the same time.
+The entire point of the lab is that they trigger real Git merge conflicts
+and resolve them.
+
+Each student has to submit a screenshot showing
+`<<<<<<<`, `=======`, and `>>>>>>>` in the `.qmd` file,
+as proof that they personally hit a conflict and looked at it.
+
+That requirement creates an obvious edge case:
+a student who misses lab,
+or whose group finishes without them,
+still needs a conflict of their own.
+So the assignment needs a documented way to produce one solo.
+
+## The Initial Ask
+
+> "if you are not in lab with your group at the time of the assignment,
+> you can create a merge conflict with yourself."
+
+One line in a much longer spec.
+The instructor said *what* the fallback was and left the *how* to Claude.
+
+## Claude's Initial Response
+
+Claude wrote a two-clone recipe:
+
+> Clone the **same** repository a second time into a different folder
+> and treat that clone as another person:
+>
+> 1. In your **first** clone, change a line in `index.qmd`, commit, and push.
+> 2. In the **second** clone, change the **same line** to something different, and commit.
+> 3. Still in the second clone, pull.
+>
+> You now have a genuine conflict to screenshot and resolve.
+> Delete the second clone afterwards so it does not confuse you later,
+> and make sure the version you leave on GitHub is the one you meant to keep.
+
+This works.
+Two working copies of one remote are two independent lines of history,
+so making them disagree on a line and pulling produces a textbook conflict.
+
+It survived several rounds of review in that form,
+including a pass that deliberately cut hand-holding from the rest of the document.
+
+## The Exchange
+
+**Turn 1 — User:**
+
+> "2 clones of the same repo is not how it was demo'ed in class.
+> in class it was done by a github web edit and a local edit at the same time"
+
+**Turn 1 — Claude:**
+
+Replaced the recipe in both places it appeared,
+and checked the lecture notes for the wording used in class:
+
+> 1. Edit `index.qmd` on GitHub in your browser and commit the change there.
+> 2. On your laptop, **without pulling first**, change the same line to something
+>    different and commit.
+> 3. Pull.
+
+Claude also flagged that `**without pulling first**` is load-bearing:
+it is the one step a student can skip
+while still appearing to follow the instructions,
+and skipping it produces a clean merge and no conflict.
+
+**Turn 2 — User:**
+
+> "you're not wrong on how to create the conflict,
+> but that's very complex to do, unlikely to happen in real life,
+> and also difficult to teach"
+
+Three separate objections,
+none of which is "incorrect".
+
+## The Final Solution
+
+The web-edit recipe, in the assignment and in the cross-reference that points to it.
+
+Beyond being what students had already seen demonstrated,
+it is shorter:
+no second clone to create, keep straight, or delete afterwards.
+The cleanup sentence that the two-clone version needed disappeared with it.
+
+It also models something real.
+Editing a file through the GitHub web interface and forgetting you did it
+is an ordinary way to end up with a conflict.
+Maintaining two clones of the same repository on one laptop is not.
+
+## The Lesson
+
+**What Claude got right:**
+
+The mechanism.
+Both recipes produce a genuine conflict for the same underlying reason,
+and Claude correctly identified the non-obvious failure mode in the new one
+(pull first and there is nothing to conflict with).
+Asked in isolation
+"how do I create a merge conflict with myself",
+the two-clone answer is defensible.
+
+**What required human expertise:**
+
+Knowing that this was not a question about Git.
+It was a question about *course design*.
+The answer had to satisfy constraints the prompt never stated:
+
+- It has to match what students were shown in lecture,
+  or the assignment contradicts the teaching.
+- It has to be simple enough to walk a struggling student through in a lab session.
+- It should resemble a situation they will actually meet again.
+
+The instructor was the only one who knew the first constraint,
+and the only one positioned to weigh the other two.
+
+**Why Claude missed it:**
+
+Claude optimized for the stated goal,
+which was producing a conflict,
+and treated correctness as the finish line.
+It had no access to what happened in the lecture,
+and did not think to ask,
+even while writing a document whose other sections
+carefully cross-reference the textbook.
+
+The deeper failure is that pedagogical documents have a success criterion
+that is not correctness.
+A recipe in an assignment is not just executed,
+it is taught, debugged over a student's shoulder, and remembered.
+Claude was not weighing those at all.
+Notably, this survived a review pass explicitly aimed at cutting complexity:
+the pass trimmed *prose* while leaving an over-complicated *procedure* untouched,
+because complexity in a procedure does not look like verbosity.
+
+**Key takeaway:**
+
+When you ask an AI for instructions someone else will follow,
+say who will follow them and what they have already been taught.
+Otherwise you get the answer that is most correct
+rather than the one that is most teachable,
+and those are rarely the same.

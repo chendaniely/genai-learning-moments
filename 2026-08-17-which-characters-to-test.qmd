@@ -1,0 +1,162 @@
+---
+title: "Learning Moment: Knowing Which Characters to Test"
+date: 2026-08-17
+categories: [claude, learning, ai-collaboration]
+---
+
+## Context
+
+A setup-check repository for the UBC Master of Data Science program. Incoming students
+clone it and run `make` to confirm their machine can do the one thing the whole program
+depends on: turn a source document into a PDF they can hand in. Three fixtures stand in
+for the three formats the program uses — `check-quarto.qmd`, `check-notebook.ipynb` and
+`check-rmarkdown.Rmd` — and a Makefile renders each of them through every available
+route.
+
+Each fixture ends with a section headed "Characters that are not plain English",
+containing a single line:
+
+```
+Montréal · naïve · Öl · 5 °C · α β γ · 10 – 20
+```
+
+Claude had been auditing that render pipeline, and found a real bug in it. Rendering
+through LaTeX exits 0, produces a PDF, and prints nothing alarming — but extracting the
+text back out of that PDF shows the literal Greek letters `α β γ` have become U+FFFD
+replacement characters. Every LaTeX route, silently, on a green build. Finding it took
+running the renders and reading the output files, not reading the source.
+
+## The Initial Ask
+
+Verify that the setup check actually verifies something — that a student who gets a PDF
+has a working toolchain, and a student with a broken one gets told.
+
+## Claude's Initial Response
+
+Claude reported the U+FFFD finding as a Unicode bug in the fixture, and proposed the
+fixes that framing implies: a font with Greek coverage, `\setmainfont`, switching the
+engine, adding a fallback font for the missing glyphs. Make the existing line render, and
+the check is honest again.
+
+That analysis was correct as far as it went. The line did not render; the proposed fixes
+addressed the line. What Claude never asked was whether that line was the right line.
+
+## The Exchange
+
+**Turn 1 — User:**
+
+> latex math formulas and equations matter for MDS
+
+**Turn 1 — Claude:**
+
+A grep for math delimiters across all three fixtures returned nothing — one `$` in the
+entire set, and it was `R.version$version.string` in an R chunk. Not a single dollar-sign
+pair, `\(`, `$$` or equation environment anywhere. A statistics program's assignments are
+substantially made of equations, and the document that certifies "your machine can render
+your assignments" contained none. The audit had been thorough about a test surface that
+omitted the single most common thing students write.
+
+Adding math and re-rendering showed it works — including through LaTeX, which is exactly
+what LaTeX is for.
+
+**Turn 2 — User:**
+
+> we should make sure the ipynb, rmd, qmd files contain emojis since sometimes we use
+> those in hw assignments
+
+**Turn 2 — Claude:**
+
+Also entirely untested, and also broken. Emoji added to the fixtures came back out of
+every LaTeX-rendered PDF as replacement characters — between 6 and 9 U+FFFD per document,
+depending on how many the fixture carried. Same silent failure mode as the Greek letters,
+same exit code 0.
+
+Nothing in the repository would have suggested emoji were worth testing. That they appear
+in real handouts is a fact about how this program writes assignments, and it lives with
+the people who write them.
+
+**Turn 3 — User:**
+
+> we should also test render to html and pdf
+
+**Turn 3 — Claude:**
+
+This one changed the diagnosis rather than adding to it. Rendering all three fixtures to
+HTML produced zero replacement characters — accents, math, literal Greek and emoji all
+intact, in all three formats. So this was never a Unicode problem, or a pandoc problem,
+or a fixture problem. It was specific to LaTeX, and only ever to LaTeX. Testing one
+output format had made a route-specific failure look like a document-wide one.
+
+## The Final Solution
+
+Fixtures that carry accents, math, literal Greek and emoji; the Makefile rendering each
+one by every route; and `ci/assert-renders.py`, which extracts text back out of the
+rendered files and asserts per route on what should be in it. The measured matrix:
+
+| route              | accents | math | literal Greek | emoji |
+|--------------------|---------|------|---------------|-------|
+| PDF via LaTeX      | yes     | yes  | **no**        | **no**|
+| PDF via Typst      | yes     | yes  | yes           | yes   |
+| HTML               | yes     | yes  | yes           | yes   |
+| WebPDF (Chromium)  | yes     | yes  | yes           | yes   |
+
+The sharp edge is in the second and third columns. Math-mode `$\alpha$` typesets
+correctly in a LaTeX PDF; the literal character `α` in prose does not. They look like the
+same capability and are not. An assignment full of equations is safe on the default
+route. An assignment with a 🎉 in a section heading, or a `σ` typed directly into a
+sentence, is silently corrupted on that same route — and the student sees a PDF and a
+zero exit code and has no reason to look.
+
+Because the differences are a measured property of the toolchain rather than a bug in any
+one document, the checker encodes them as expectations per route, including negative
+ones: routes known not to support a character assert that it is *absent*, so that a
+future TeX upgrade quietly fixing the problem shows up as a failing test rather than
+being absorbed unnoticed.
+
+## The Lesson
+
+**What Claude got right:**
+
+The investigation itself. Nobody had noticed the corruption before, because every signal
+a person normally checks — exit status, file exists, no error output — was green. Getting
+to it required rendering the documents, extracting the text back out of the PDFs, and
+comparing against the source, and then doing the same across four routes and three
+formats to turn "it's broken" into a matrix. Every claim in the table above was produced
+by running something. None of it was reasoned from documentation.
+
+**What required human expertise:**
+
+The list of what an assignment actually contains. That is not in the repository, and it
+cannot be derived from it. It comes from having taught the course, written the handouts
+and read what students submit. Three short sentences from the user added two whole
+categories of input — math and emoji — one of which was entirely fine and one of which
+was entirely broken, and a third instruction that reclassified the bug from "Unicode" to
+"LaTeX".
+
+Note how cheap those interventions were. None was longer than a line. They were not
+corrections of Claude's reasoning; they were facts Claude had no access to.
+
+**Why Claude missed it:**
+
+The fixture defined the test surface, and Claude accepted that definition. There was a
+section headed "Characters that are not plain English", so the question became "do these
+characters render?" — and that question has an answer, which is findable, which felt like
+the work. The prior question, "is this the right set of characters?", never got asked,
+because answering it requires information that is not in the codebase and Claude had no
+signal that it was missing.
+
+This is a specific form of confirmation bias, and it is structural rather than
+accidental. Given an existing test suite, the available work is verifying that the tests
+pass. Asking whether the tests cover the real input distribution requires knowing the
+real input distribution — so the question is invisible from inside the repository, and
+the audit terminates in a state that looks complete. Claude reported a bug found, a fix
+proposed, and evidence gathered. All true, and the thing being tested was still the wrong
+thing.
+
+**Key takeaway:**
+
+When an AI audits a test suite, it will verify that the existing tests pass rather than
+ask whether they cover the real inputs — the first question is answerable from the code
+and the second is not. The set of inputs your users actually produce is domain knowledge.
+It has to be supplied, it is usually one sentence long, and it is often the difference
+between a test suite that passes and a test suite that means something.

@@ -1,0 +1,104 @@
+---
+title: "Learning Moment: Don't Reach for a Separate Config File Until You Know What's Actually Secret"
+date: 2026-07-03
+categories: [claude, learning, ai-collaboration]
+---
+
+## Context
+
+Designing a Dockerized Tailscale client for a dotfiles repo: a container that
+joins a *second*, separate private network so SSH port-forwards to a remote
+server stay available, without disturbing the host machine's existing
+connection to its primary Tailscale network. The design was
+being built as a Dockerfile + `docker-compose.yml`, with a stated requirement
+that adding new forwarded hosts/ports later shouldn't require editing the
+Dockerfile, and that local host-side ports needed to stay easy to change
+(to avoid colliding with other local apps).
+
+## The Initial Ask
+
+The user asked how the list of SSH forwards (remote host, remote port,
+mapped port) should be defined so that adding a new destination later is
+just an edit, not a rebuild. Claude offered a choice between:
+
+1. A `.env` file read by `docker-compose`, parsed by a startup script into
+   multiple `-L` flags for an `autossh` tunnel.
+2. A separate mounted config file (e.g. `forwards.conf`), one
+   `remote_host:remote_port:local_port` entry per line.
+
+The user picked option 2 (the file), but then paused and questioned the
+premise:
+
+> "let's go with option 2. the .env file may not get checked into git and
+> i'll lose the reference on how to set it up. i can also have those put
+> directly into the compose file? why does it need to be a separate file?"
+
+## Claude's Initial Response
+
+Claude had proposed the file-based config purely as a way to make the
+forwards list easy to extend later — it hadn't separately asked whether the
+values involved (hostnames, ports) were actually sensitive, and defaulted to
+a "config file" pattern that's more typically reached for when secrets are
+involved (which need to stay out of version control).
+
+## The Exchange
+
+**Turn 1 — User:**
+Picked the config-file option, but flagged the practical downside: `.env`
+files are conventionally gitignored, so the setup instructions would live
+in a file that might never actually get committed — defeating the point of
+having a durable reference. Asked directly why the values couldn't just live
+in `docker-compose.yml` itself.
+
+**Turn 1 — Claude:**
+Agreed the concern was valid, and re-examined the actual constraint: none of
+the forward definitions (hostnames, ports) needed hiding in this private
+repo — the only thing that needed real host-specific flexibility was the
+*local* port mapping (to dodge port collisions on a given machine).
+(That only holds because the repo is private: hostnames on someone else's
+network are still infrastructure details, and don't belong in a public
+repo.) Revised the design to:
+- Put the forwards list as environment variables directly inside the tracked
+  `docker-compose.yml` (single source of truth, always in git).
+- Use Docker Compose's built-in override-file mechanism
+  (`docker-compose.override.yml`) — untracked, per-machine — for the one
+  thing that genuinely varied by machine: local port numbers.
+
+## The Final Solution
+
+One tracked `docker-compose.yml` containing the forwards list and sensible
+default port mappings. An optional, untracked
+`docker-compose.override.yml` per machine, used only when that machine had
+an actual local port conflict — no custom `.env` parsing logic, no separate
+config file to lose track of.
+
+## The Lesson
+
+**What Claude got right:**
+Correctly identified that the forwards list should be config-driven rather
+than hardcoded into the Dockerfile, and that local port mappings needed to
+stay independently changeable.
+
+**What required human expertise:**
+The user recognized that the proposed indirection (a `.env` file or a
+mounted config file) introduced a *new* problem — a file that conventionally
+doesn't get committed — that worked against the actual goal of having a
+durable, findable reference for how the setup works. They also knew that
+Docker Compose already has a native mechanism (override files) purpose-built
+for per-machine variation, so no custom solution was needed at all.
+
+**Why Claude missed it:**
+Claude pattern-matched "this value might need to vary" to the generic
+"put it in a config/env file" convention, which is the right move for
+*secrets*, without first checking whether these particular values were
+secret. Optimized for the stated goal (make it easy to add forwards later)
+without asking the sharper question: which parts of this config are
+actually machine- or environment-specific, versus just... configuration
+that's fine to check in?
+
+**Key takeaway:**
+Before reaching for indirection (a separate config file, a `.env`, an
+extra layer), ask what's actually secret or environment-specific. If
+nothing is, put the values directly in the tracked file — and if something
+*is* genuinely environment-specific, look for the tool's native mechanism
+for that (like Compose override files) before inventing your own.

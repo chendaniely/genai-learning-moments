@@ -1,0 +1,160 @@
+---
+title: "Learning Moment: When the Checker Deletes Its Own Output"
+date: 2026-08-17
+categories: [claude, learning, ai-collaboration]
+---
+
+## Context
+
+A setup-check repository for the UBC Master of Data Science program. Incoming students
+clone it and run `make` to confirm their machine can turn a source document into a PDF
+they can hand in. A Makefile renders each fixture by every available route, so that a
+student whose toolchain is broken finds out here rather than the night an assignment is
+due.
+
+One of those fixtures, `check-quarto.qmd`, is rendered three ways from the single source
+file: to PDF through LaTeX, to PDF through Typst, and to HTML. Typst matters because it
+needs no LaTeX at all and, unlike the LaTeX route, reproduces emoji and literal Greek
+letters — so it is the route a student is told to use for a document containing them.
+
+## The Initial Ask
+
+Add the Typst route to the build, alongside the LaTeX PDF target that was already there.
+
+## Claude's Initial Response
+
+Claude added a `typst` target to the Makefile and ran the build. `make -k all` reported
+success. Eight outputs were expected. Seven were on disk.
+
+`check-quarto.pdf` was not, and nothing anywhere said so. No non-zero exit, no error, no
+warning. The build log even contained the LaTeX render finishing normally:
+
+```
+Output created: check-quarto.pdf
+```
+
+Claude isolated it by rendering the formats one at a time and listing the directory
+between each:
+
+```
+render --to pdf     -> check-quarto.pdf         exists
+render --to html    -> check-quarto.pdf         still exists
+render --to typst   -> check-quarto.pdf         GONE
+```
+
+The cause: Quarto treats the LaTeX PDF and the Typst PDF as the *same output* for a given
+input, because both are `.pdf` produced from `check-quarto.qmd`. Rendering one removes the
+other. Silently — the file simply is not there afterwards.
+
+Worth recording, because it is the sharper half of this note: Claude had already seen this
+symptom earlier in the same session. It observed that `check-quarto.pdf` succeeded in run
+1 and failed in run 2, wrote that down, and moved on, because it was mid-task on something
+else and the inconsistency looked like noise.
+
+## The Exchange
+
+**Turn 1 — User:**
+
+Pointed at the gap directly — the build is green and the file is not on disk.
+
+**Turn 1 — Claude:**
+
+Having found the collision, Claude proposed a fix at the shell level: copy
+`check-quarto.qmd` to a second, temporary filename, render Typst from the copy, then
+delete the copy. Two inputs, two outputs, no collision.
+
+It worked. It was also order-independent, so it would survive `make -j`. But it added a
+temporary file to the Makefile and a matching line to `clean`, and the two PDFs still had
+names that said nothing about which engine produced them.
+
+**Turn 2 — User:**
+
+> we should have a check-quarto-latex.pdf and a check-quarto-typst-pdf file if that helps.
+> the qmd file would have different output formats and file names
+
+**Turn 2 — Claude:**
+
+That is the tool-native answer, and it removes the problem rather than working around it.
+Quarto lets a single document declare several formats in its YAML, each with its own
+`output-file`:
+
+```yaml
+format:
+  # One source, three routes, each to its own file. Quarto treats the LaTeX PDF
+  # and the Typst PDF as the same output for a given input unless they are named
+  # apart, and rendering one then deletes the other.
+  pdf:
+    output-file: check-quarto-latex.pdf
+  typst:
+    output-file: check-quarto-typst.pdf
+  html:
+    output-file: check-quarto.html
+```
+
+Verified by re-running the same bisection in the reverse order that had destroyed the file
+before — `--to typst`, then `--to pdf`, then `--to html`. All three outputs coexisted. The
+temp-copy hack was deleted.
+
+## The Final Solution
+
+The per-format `output-file` block above, plus Makefile targets that name the real
+artifacts:
+
+```make
+pdf: check-quarto-latex.pdf check-notebook.pdf check-rmarkdown.pdf
+typst: check-quarto-typst.pdf
+```
+
+No temporary file, nothing extra in `clean`, and the outputs are now named for what
+produced them — which turns out to matter beyond the bug, because the whole point of
+keeping both PDF routes is that they do not handle the same characters. `check-quarto.pdf`
+answered "did a PDF get made?". `check-quarto-latex.pdf` and `check-quarto-typst.pdf`
+answer "did *this route* work?", which is the question the repository exists to ask.
+
+The reason is recorded where the next person will hit it, in the YAML comment above and
+again next to the Makefile target, so that nobody later "tidies up" the names and silently
+reintroduces the collision.
+
+## The Lesson
+
+**What Claude got right:**
+
+The diagnosis. A file that is missing with no error and no failing exit code gives you
+nothing to grep for, and Claude did the one thing that works: stop reasoning about it, run
+the renders one at a time, and list the directory between each until the disappearance has
+a specific cause. Three commands, and an unexplained absence became a reproducible rule
+about how the tool treats output paths. The fix it then proposed was correct and even
+handled parallel builds.
+
+**What required human expertise:**
+
+Knowing that Quarto supports multiple formats in one document with per-format
+`output-file`. That is not a deduction from the symptom; it is a fact about the tool, and
+the user had it. One sentence, and the fix moved from the shell to the document — which is
+also where it becomes self-documenting, because the reason now lives in the file that
+causes the behaviour.
+
+**Why Claude missed it:**
+
+Claude was solving the problem it had just characterised. It had framed the bug as "two
+renders collide on one path", and the shell offers an obvious lever for that: change the
+input path. Working around a tool from outside is nearly always available, so it is nearly
+always the first thing found — whereas using the tool's own mechanism requires knowing the
+mechanism exists, and there is no signal in a collision that tells you to go looking for
+one.
+
+The earlier miss is the more instructive one. Claude saw the file appear in one run and
+vanish in the next, and classified it as flakiness to revisit later. That instinct is
+usually reasonable and here was exactly backwards: the artifact behaving
+non-deterministically was the *verification harness*. Its entire job is to tell a student
+which render routes work on their machine. A route that produces nothing while the build
+reports success is precisely the failure this project exists to catch — and it was in the
+detection apparatus itself. Claude deprioritised it because it was mid-task, which is a
+scheduling decision, not a judgment about severity, and no one had told it that
+inconsistency in a checker outranks whatever else is in flight.
+
+**Key takeaway:**
+
+When the thing that verifies your work behaves inconsistently, stop and explain it before
+trusting any of its output — and when a tool creates the problem, look for the tool's own
+mechanism before reaching for a shell-level workaround.

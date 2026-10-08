@@ -1,0 +1,188 @@
+---
+title: "Learning Moment: Thirty Lines of Bash Where `cat` Would Do"
+date: 2026-07-28
+categories: [claude, learning, ai-collaboration]
+---
+
+## Context
+
+A repo of reusable GitHub Actions, including one that scans an R project
+for its package dependencies and writes three CSVs. The action ships in
+two variants — a composite action and a Docker action — each with a test
+workflow that runs it against an example R project and then publishes the
+results with `actions/upload-artifact`. (The repo's details, names and
+paths in this note are generalized.)
+
+The artifact upload was failing on the runners in use, so the workflows
+were producing correct CSVs that nobody could see.
+
+## The Initial Ask
+
+> "for the [action], let's also have a step that prints out the values
+> into the action, i'm currently running into a [upload] problem to save out the
+> artifact, but i still want to show that the action is working"
+
+A debugging request with a clear shape: the upload is broken, I need eyes on
+the output anyway, put the values in the log.
+
+## Claude's Initial Response
+
+Claude added a `Show report CSVs` step to both test workflows, positioned
+before the upload step so a failing upload couldn't hide it. That placement
+was right. The step itself was 28 lines of bash:
+
+```bash
+set -euo pipefail
+shopt -s nullglob
+csvs=("$REPORT_DIR"/*.csv)
+if [ ${#csvs[@]} -eq 0 ]; then
+  echo "No CSVs found in $REPORT_DIR" >&2
+  exit 1
+fi
+for f in "${csvs[@]}"; do
+  rows=$(( $(wc -l < "$f") - 1 ))   # minus the header
+  echo "::group::$f ($rows rows)"
+  cat "$f"
+  echo "::endgroup::"
+  {
+    echo "### $(basename "$f") ($rows rows)"
+    echo '```csv'
+    head -n 201 "$f"
+    if [ "$rows" -gt 200 ]; then
+      echo "... truncated; full contents in the step log"
+    fi
+    echo '```'
+  } >> "$GITHUB_STEP_SUMMARY"
+done
+```
+
+Features nobody asked for: per-file row counts, collapsible `::group::`
+folding, a parallel copy of everything rendered as Markdown into
+`$GITHUB_STEP_SUMMARY`, a 200-row truncation cap to stay under the summary's
+size limit, and a `nullglob` guard with an explicit empty-array check.
+
+Claude then tested the block locally against fixture CSVs, confirmed the
+truncation and empty-directory branches both behaved, and reported the
+verification results — which made the whole thing feel diligent.
+
+## The Exchange
+
+**Turn 1 — User:**
+
+> "why is this so much more complicated than `cat` the files?"
+
+**Turn 1 — Claude:**
+Conceded the point and audited each addition rather than defending it. Most
+of it was Claude deciding on its own that the user *also* wanted results on
+the run summary page; the truncation logic existed only to serve that
+self-assigned requirement.
+
+The sharpest finding was the `nullglob` guard. It looked like the one piece
+with real defensive value, but it wasn't: with a plain glob, a missing
+directory means bash passes `*.csv` through literally, `tail` errors, and the
+step exits 1. Eight lines of "safety" reimplemented behavior bash already
+had for free.
+
+One piece survived the audit — using `tail -n +1` instead of `cat`. It is
+`cat` plus a `==> filename <==` banner per file, which matters here only
+because the three CSVs have different column headers and would otherwise run
+together indistinguishably. Claude cut everything else, including the
+`::group::` folding.
+
+**Turn 2 — User:**
+
+> "oh i see what you did there. there are 3 groups that expand in the action.
+> that's a nice touch. let's put the groups back. the action print out still
+> shows the header, so we can also just drop whatever you were doing with
+> dropping header and just show the raw text with cat. we don't need tail -1"
+
+The user had gone and looked at what the `::group::` markers actually did in
+the Actions UI, decided the three collapsible sections were worth having, and
+asked for that one piece back — while confirming the rest should stay gone.
+With a group label already naming each file, the `tail -n +1` banner became
+redundant, and the row count (and its fiddly subtract-one-for-the-header
+arithmetic) was never wanted.
+
+**Turn 2 — Claude:**
+Restored the `::group::`/`::endgroup::` loop with a plain `cat` body and no
+counts. Then checked one thing before declaring it done: a bare `for` loop
+normally reports the exit status of its *last* command, which would be the
+closing `echo` — so a failing `cat` could be swallowed and the step could pass
+green with no output. Testing under `bash -e` (how GitHub invokes `run:` steps
+on Linux) confirmed the missing-file case still exits 1. No guard needed, but
+worth confirming rather than assuming.
+
+## The Final Solution
+
+Five lines of shell per workflow, still placed before the upload step:
+
+```yaml
+      # Print the CSVs to the log, so a run is verifiable even when the artifact
+      # upload fails. ::group:: makes each file foldable in the Actions UI.
+      - name: Show report CSVs
+        run: |
+          for f in examples/r/my-project/*.csv; do
+            echo "::group::$f"
+            cat "$f"
+            echo "::endgroup::"
+          done
+```
+
+## The Lesson
+
+**What Claude got right:**
+The one genuinely non-obvious part of the task — ordering. Putting the print
+step *before* `upload-artifact` is what makes it useful, because a failing
+upload aborts the job and would take any later diagnostic down with it. Claude
+also correctly applied the change to both the composite and Docker variants
+rather than just the one in front of it.
+
+**What required human expertise:**
+Proportionality, twice, in opposite directions. First the user knew what this
+step actually was: a throwaway diagnostic for eyeballing three small CSVs
+while blocked on an unrelated upload problem. Disposable code that a
+human reads once does not need pagination, structured summary rendering, or
+defensive guards. Then — having seen what the `::group::` markers rendered as
+in the Actions UI — they knew that *one* of the discarded flourishes was
+genuinely worth its two lines, and asked for it back. The expertise wasn't
+"less code is better." It was knowing which specific complexity paid for
+itself in *this* interface, for *this* reader.
+
+That second correction is the more interesting one, because Claude
+over-corrected. Told the code was too complicated, it cut everything,
+including the good part. Swinging from over-built to stripped-bare is the
+same failure as the original: substituting a general rule about how much code
+to write for a judgment about what this particular output needed.
+
+**Why Claude missed it:**
+Several reinforcing reasons, and the mix is the interesting part.
+
+1. *Default to production quality.* Claude treats every code block as if it
+   will be maintained forever. Nothing in the prompt said "this is
+   disposable," but the situation said it loudly: the user was mid-debugging,
+   blocked, and asking for evidence.
+2. *Additive bias, and burying the good idea.* Every single addition was
+   locally defensible — row counts are informative, a summary view is
+   convenient, truncation prevents hitting a real 1 MiB limit. No individual
+   step felt excessive, so complexity accreted without ever reaching a
+   decision point where Claude asked whether the total was justified. The
+   cost wasn't only the wasted lines: the one addition that *was* worth
+   having, the collapsible groups, arrived buried among five that weren't, so
+   it read as more clutter instead of as a suggestion worth a look. Offering
+   it alone — "want these foldable in the UI?" — would have gotten a yes
+   immediately.
+3. *Verification created false confidence.* Claude tested the bash, watched
+   the branches work, and reported it. But testing establishes that code is
+   *correct*, never that it should *exist*. Demonstrating that an unnecessary
+   feature works makes it feel earned, which is exactly backwards.
+4. *Reasoning about failure abstractly instead of checking.* The `nullglob`
+   guard came from asking "what if there are no files?" and answering from
+   first principles, rather than running the two-word experiment that would
+   have shown the default already failed correctly.
+
+**Key takeaway:**
+Ask what happens to a piece of code after it works — code you will read once
+while debugging should be about as small as the thing it inspects. When you
+do want to add something beyond the ask, offer it as one visible choice
+rather than folding five of them into the delivered code, or the good idea
+gets thrown out with the rest.

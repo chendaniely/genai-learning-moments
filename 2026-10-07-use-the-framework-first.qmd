@@ -1,0 +1,218 @@
+---
+title: "Learning Moment: A Hand-Built Card Where a Quarto Callout Would Do"
+date: 2026-10-07
+categories: [claude, learning, ai-collaboration]
+---
+
+## Context
+
+A personal website and blog built with Quarto,
+with a fairly heavy custom theme on top:
+a commented `theme.scss`,
+dark-mode overrides in `theme-dark.scss`,
+and a small script that gives cards a random resting tilt.
+
+The task was a blog post about using AI in teaching.
+One sentence leaned on a term that needed explaining:
+
+> vibe coding is Andrej Karpathy's term for coding where you "forget that the code even exists"
+
+## The Initial Ask
+
+> "for (vibe coding is Andrej Karpathy's term for coding where you "forget that the code even exists") i feel like it would be fun to have some kind of definition card that definds this/ card / callout."
+
+A follow-up message added a constraint:
+don't link to X, because those links rot.
+
+> "i don't trus x links. we lost so many links to twitter so here's a screenshot of the karpathy post [...] don't forget the full alt text when you insert it"
+
+Note the wording of the first message: "card / callout."
+Both options were on the table.
+
+## Claude's Initial Response
+
+Claude built a bespoke dictionary-entry card.
+The markup was a Pandoc definition list inside a custom `.definition` div,
+with a pronunciation hidden from screen readers and a part-of-speech label:
+
+```markdown
+::: {.definition}
+vibe coding [/vaɪb ˈkoʊdɪŋ/]{.pron aria-hidden="true"} [noun]{.pos}
+:   Andrej Karpathy's term for coding where you "fully give in to the vibes,
+    embrace exponentials, and forget that the code even exists."
+
+    ![Karpathy's post that named it, February 2, 2025.](karpathy.png){fig-alt="..."}
+:::
+```
+
+Making it look right took changes in four places:
+
+- **`theme.scss`:** about 40 new lines.
+  The card's background, border, radius and shadow,
+  an orange rule under the term styled as an index card's header line,
+  muted styles for the pronunciation, part of speech and caption,
+  and a rotation rule in the motion section.
+- **`theme-dark.scss`:** dark-mode background and text colors for the card.
+- **`scroll-reveal.html`:** one line of JavaScript, `tilt(".definition", 1)`,
+  so the card got a random tilt like the site's other cards.
+- **`AGENTS.md`:** a new section documenting the markup,
+  so the pattern could be reused.
+
+Claude checked it in both light and dark mode with browser screenshots.
+It looked good, and the user said so.
+
+## The Exchange
+
+**Turn 1 — User:**
+
+> "i like your definitions card, but i think it's a bit too custom. let's use the https://quarto.thecoatlessprofessor.com/custom-callout/ quarto extension for this instead of a custom div (easeir to implement and re-use in the future)"
+
+The user later said why, while asking for this write-up:
+
+> "this is a quarto site and i'm trying to leverage more of the quarto features instead of writing massive custom things"
+
+**Turn 1 — Claude:**
+Read the extension's docs,
+then confirmed that every uncommitted change in the three style files was its own before reverting them.
+Installed the extension with `quarto add coatless-quarto/custom-callout`,
+defined a `definition` callout type once in `_quarto.yml`,
+and swapped the post's markup to `::: {.definition title="vibe coding"}`.
+Claude also read the extension's Lua filter to see how it applies color,
+and rendered screenshots in both modes again.
+
+In the switch, Claude also dropped the pronunciation and the part of speech.
+It filed them under "too custom" along with the SCSS.
+
+**Turn 2 — User:**
+
+> "For the vibecoding definition, I liked what you did before were you actually had the phonetic pronunciation for the term by coding? I thought that was a nice little fun touch so we can have also definition: in the title as well so it looks more like a dictionary entry."
+
+**Turn 2 — Claude:**
+Went back to the extension's Lua source
+and found that a heading as the first element of the div becomes the callout's title.
+A heading can hold formatted text,
+so the pronunciation and the italic *noun* fit in the title.
+Rendering it turned up one more problem:
+Quarto already gives every callout a hidden "Definition" label for screen readers,
+so a visible "Definition:" would be read twice.
+Claude hid the visible label from screen readers with `aria-hidden`,
+the same way the pronunciation was hidden.
+
+## The Final Solution
+
+One `quarto add`, seven lines of YAML in `_quarto.yml`,
+and no custom CSS or JavaScript:
+
+```yaml
+filters:
+  - custom-callout
+custom-callout:
+  definition:
+    title: "Definition"
+    icon-symbol: "fa-book"
+    color: "#7E7468"  # brand warm-gray: the built-in callouts already use blue, green, orange, burgundy
+```
+
+The post uses it like any built-in callout:
+
+```markdown
+::: {.definition}
+## [Definition:]{aria-hidden="true"} vibe coding [/vaɪb ˈkoʊdɪŋ/]{aria-hidden="true"} *noun*
+
+Andrej Karpathy's term for coding where you "fully give in to the vibes,
+embrace exponentials, and forget that the code even exists."
+
+![Karpathy's post that named it, February 2, 2025.](karpathy.png){fig-alt="..."}
+:::
+```
+
+Dark mode, the icon and the tinted header come from the callout system.
+Any future page can define a term the same way,
+and the `AGENTS.md` section now points to the extension instead of to custom styles.
+
+## The Lesson
+
+**What Claude got right:**
+The content and the reader-facing details.
+The user liked the card,
+and most of it survived:
+the dictionary framing, the pronunciation,
+the screenshot instead of an X link that could rot,
+full alt text for that screenshot,
+and checking both color modes before calling it done.
+When it came time to undo the custom styles,
+Claude checked that the uncommitted changes were all its own before reverting them,
+rather than assuming.
+
+**What required human expertise:**
+Knowing the tools.
+The user knew Quarto well enough to know that a callout was the right building block,
+and that an extension already existed to add new callout types.
+As they put it later:
+
+> "this way I'm using more [Quarto] features instead of just making something that's [coded] from scratch and that's a signal around me knowing the tools that I'm working with"
+
+That's the expertise here.
+An AI can write custom code to almost any size.
+The person who knows the tool knows when none of it is needed.
+
+The irony is that the blog post being edited makes this exact point.
+In one of the instructor's courses,
+a student had ChatGPT rewrite all of the CSS on their Quarto slides to make the text fit,
+when the fix was Quarto's built-in `.smaller` class,
+a one- or two-line change.
+The post's lesson is that "you still need to know what your other tools (like Quarto) are already capable of,
+or the LLM is going to go off and do something you don't want."
+In the same post, Claude did what the student's ChatGPT did:
+40 lines of custom styles for something Quarto already had a feature for.
+And the person who knew the tool caught it.
+
+There's also a maintenance judgment.
+The user wants this to be a Quarto site that leans on Quarto,
+not a hand-styled site that happens to be built with Quarto.
+A callout type is seven lines of config that any page can use,
+while the custom card was four files of styles and script
+that future posts would have to remember and match.
+
+The second correction mattered just as much.
+"Too custom" was about the *implementation*, not the *idea*.
+Claude stripped the fun parts along with the SCSS.
+The user wanted the same dictionary entry, built from framework parts.
+
+**Why Claude missed it:**
+
+1. *Local patterns beat framework patterns.*
+   The repo already had a sizable custom theme:
+   signpost cards, a tilt script, a dark-mode override file.
+   Claude extended what was in front of it,
+   so "how this repo does things" looked like "write more SCSS."
+   The repo's history pulled harder than the framework's features.
+2. *The request's wording steered toward visual design.*
+   "Fun" and "card" read as a design brief,
+   even though the same sentence said "callout."
+   Claude picked the more open-ended option
+   instead of asking which one the user meant.
+3. *Reuse cost wasn't part of the decision.*
+   Claude did document the markup for reuse,
+   but documenting a custom pattern isn't the same as making it cheap.
+   The question "what does the next post have to do to use this?"
+   was answered by adding docs, not by choosing a simpler mechanism.
+4. *Extensions take looking up.*
+   Claude knows Quarto's built-in callouts well,
+   but third-party extensions take a search,
+   and Claude didn't search before building.
+5. *Over-correcting on the switch.*
+   Told the card was too custom,
+   Claude cut the content's personality along with the implementation.
+   It's the same over-correction as in an earlier moment,
+   [Thirty Lines of Bash Where `cat` Would Do](2026-07-28-over-engineering-the-ask.qmd):
+   swinging from over-built to stripped-bare
+   instead of asking which parts were actually the problem.
+   Reading the extension's source showed that it supported the fun parts all along.
+
+**Key takeaway:**
+Knowing your tools is what lets you catch an AI building from scratch something the tool already does.
+So before accepting custom code, ask "does the framework, or one of its extensions, already do this?"
+And when you switch to the framework's version,
+bring the content along:
+what was too custom was the implementation, not the idea.
