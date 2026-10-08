@@ -1,0 +1,32 @@
+project:
+  type: website
+  # Only these become pages. README.md and CLAUDE.md stay repo docs.
+  render:
+    - index.qmd
+    - about.qmd
+    - posts/*.qmd
+
+website:
+  title: "GenAI Learning Moments"
+  description: "Worked examples of human expertise correcting or improving an AI assistant's first answer."
+  site-url: https://chendaniely.github.io/genai-learning-moments/
+  repo-url: https://github.com/chendaniely/genai-learning-moments
+  repo-actions: [source, issue]
+  navbar:
+    right:
+      - about.qmd
+      - icon: rss
+        href: index.xml
+        aria-label: RSS feed
+      - icon: github
+        href: https://github.com/chendaniely/genai-learning-moments
+        aria-label: GitHub repository
+  page-footer:
+    center: "Content is [CC0 1.0](https://github.com/chendaniely/genai-learning-moments/blob/main/LICENSE). Built with [Quarto](https://quarto.org)."
+
+format:
+  html:
+    theme:
+      light: flatly
+      dark: darkly
+    toc: true

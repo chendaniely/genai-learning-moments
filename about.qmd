@@ -1,0 +1,30 @@
+---
+title: "About"
+toc: false
+---
+
+These are moments from real working sessions with an AI coding assistant,
+where its first answer was reasonable but human expertise changed the outcome.
+They are written up as teaching material for students learning to work with these tools.
+
+## How to read a moment
+
+Every moment follows the same structure:
+
+- **Context**: the project or task being worked on.
+- **The Initial Ask**: the prompt that started the exchange.
+- **Claude's Initial Response**: what the assistant produced first.
+- **The Exchange**: every turn of correction and revision, including the false starts.
+- **The Final Solution**: what was actually used.
+- **The Lesson**: what the assistant got right, what took human expertise,
+  *why* the assistant missed it, and one takeaway to remember.
+
+The *why* is the most useful part.
+It names the structural reason the gap happened, so you can spot the same gap in your own sessions.
+
+## How they are made
+
+Each moment is drafted with the
+[`capture-learning-moment`](https://github.com/chendaniely/skills/tree/main/capture-learning-moment)
+Claude Code skill, from the conversation it describes.
+Hostnames, IP addresses, usernames and other identifying values are replaced with placeholders.

@@ -1,0 +1,16 @@
+---
+title: "GenAI Learning Moments"
+listing:
+  contents: posts
+  sort: "date desc"
+  type: default
+  categories: true
+  sort-ui: true
+  filter-ui: true
+  feed: true
+page-layout: full
+title-block-banner: true
+---
+
+Examples of correcting an AI assistant's output, written up for students.
+Each one shows a reasonable first answer, the human knowledge that changed it, and why the AI missed it.
