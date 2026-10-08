@@ -264,6 +264,7 @@ font-style: inherit;">done</span></span></code></pre></div></div>
   <category>claude</category>
   <category>learning</category>
   <category>ai-collaboration</category>
+  <category>writing</category>
   <guid>https://chendaniely.github.io/genai-learning-moments/posts/2026-10-07-summaries-lose-the-argument.html</guid>
   <pubDate>Wed, 07 Oct 2026 00:00:00 GMT</pubDate>
 </item>
@@ -458,6 +459,9 @@ font-style: inherit;">![Karpathy's post that named it, February 2, 2025.](karpat
   <category>claude</category>
   <category>learning</category>
   <category>ai-collaboration</category>
+  <category>quarto</category>
+  <category>css</category>
+  <category>over-engineering</category>
   <guid>https://chendaniely.github.io/genai-learning-moments/posts/2026-10-07-use-the-framework-first.html</guid>
   <pubDate>Wed, 07 Oct 2026 00:00:00 GMT</pubDate>
 </item>
@@ -551,6 +555,9 @@ font-style: inherit;">![Karpathy's post that named it, February 2, 2025.](karpat
   <category>claude</category>
   <category>learning</category>
   <category>ai-collaboration</category>
+  <category>teaching</category>
+  <category>git</category>
+  <category>writing</category>
   <guid>https://chendaniely.github.io/genai-learning-moments/posts/2026-09-13-teachable-beats-correct.html</guid>
   <pubDate>Sun, 13 Sep 2026 00:00:00 GMT</pubDate>
 </item>
@@ -880,6 +887,10 @@ font-style: inherit;">as</span> error:</span>
   <category>claude</category>
   <category>learning</category>
   <category>ai-collaboration</category>
+  <category>python</category>
+  <category>github</category>
+  <category>refactoring</category>
+  <category>maintainability</category>
   <guid>https://chendaniely.github.io/genai-learning-moments/posts/2026-09-03-fix-belongs-in-the-wrapper.html</guid>
   <pubDate>Thu, 03 Sep 2026 00:00:00 GMT</pubDate>
 </item>
@@ -1178,6 +1189,9 @@ font-style: inherit;">return</span> path</span></code></pre></div></div>
   <category>claude</category>
   <category>learning</category>
   <category>ai-collaboration</category>
+  <category>python</category>
+  <category>refactoring</category>
+  <category>over-engineering</category>
   <guid>https://chendaniely.github.io/genai-learning-moments/posts/2026-09-03-reviewability-is-a-requirement.html</guid>
   <pubDate>Thu, 03 Sep 2026 00:00:00 GMT</pubDate>
 </item>
@@ -1321,6 +1335,9 @@ font-style: inherit;">- </span>**`pyproject.toml`** is the file that replaced it
   <category>claude</category>
   <category>learning</category>
   <category>ai-collaboration</category>
+  <category>teaching</category>
+  <category>writing</category>
+  <category>python</category>
   <guid>https://chendaniely.github.io/genai-learning-moments/posts/2026-08-26-introduce-before-you-rely-on-it.html</guid>
   <pubDate>Wed, 26 Aug 2026 00:00:00 GMT</pubDate>
 </item>
@@ -1502,6 +1519,9 @@ font-style: inherit;">`python -m venv`</span>,</span></code></pre></div></div>
   <category>claude</category>
   <category>learning</category>
   <category>ai-collaboration</category>
+  <category>teaching</category>
+  <category>writing</category>
+  <category>python</category>
   <guid>https://chendaniely.github.io/genai-learning-moments/posts/2026-08-26-venv-is-a-module.html</guid>
   <pubDate>Wed, 26 Aug 2026 00:00:00 GMT</pubDate>
 </item>
@@ -1646,6 +1666,10 @@ typst: check-quarto-typst.pdf</code></pre>
   <category>claude</category>
   <category>learning</category>
   <category>ai-collaboration</category>
+  <category>quarto</category>
+  <category>pdf</category>
+  <category>testing</category>
+  <category>debugging</category>
   <guid>https://chendaniely.github.io/genai-learning-moments/posts/2026-08-17-checker-deletes-its-output.html</guid>
   <pubDate>Mon, 17 Aug 2026 00:00:00 GMT</pubDate>
 </item>
@@ -1877,6 +1901,10 @@ font-style: inherit;">;</span></span>
   <category>claude</category>
   <category>learning</category>
   <category>ai-collaboration</category>
+  <category>quarto</category>
+  <category>pdf</category>
+  <category>python</category>
+  <category>over-engineering</category>
   <guid>https://chendaniely.github.io/genai-learning-moments/posts/2026-08-17-install-dont-borrow-pandoc.html</guid>
   <pubDate>Mon, 17 Aug 2026 00:00:00 GMT</pubDate>
 </item>
@@ -1984,6 +2012,9 @@ all: pdf typst html webpdf  ## Render every document by every route</code></pre>
   <category>claude</category>
   <category>learning</category>
   <category>ai-collaboration</category>
+  <category>ux</category>
+  <category>teaching</category>
+  <category>maintainability</category>
   <guid>https://chendaniely.github.io/genai-learning-moments/posts/2026-08-17-makefile-is-an-interface.html</guid>
   <pubDate>Mon, 17 Aug 2026 00:00:00 GMT</pubDate>
 </item>
@@ -2113,6 +2144,9 @@ font-style: inherit;">"(^| )(3\.(1[0-9]|[2-9][0-9])|[4-9]\.[0-9]+|...)"</span></
   <category>claude</category>
   <category>learning</category>
   <category>ai-collaboration</category>
+  <category>testing</category>
+  <category>debugging</category>
+  <category>pdf</category>
   <guid>https://chendaniely.github.io/genai-learning-moments/posts/2026-08-17-when-the-harness-lies.html</guid>
   <pubDate>Mon, 17 Aug 2026 00:00:00 GMT</pubDate>
 </item>
@@ -2231,6 +2265,8 @@ font-style: inherit;">"(^| )(3\.(1[0-9]|[2-9][0-9])|[4-9]\.[0-9]+|...)"</span></
   <category>claude</category>
   <category>learning</category>
   <category>ai-collaboration</category>
+  <category>testing</category>
+  <category>pdf</category>
   <guid>https://chendaniely.github.io/genai-learning-moments/posts/2026-08-17-which-characters-to-test.html</guid>
   <pubDate>Mon, 17 Aug 2026 00:00:00 GMT</pubDate>
 </item>
@@ -2350,6 +2386,9 @@ font-style: inherit;">"α"</span>,        {FULL}),</span>
   <category>claude</category>
   <category>learning</category>
   <category>ai-collaboration</category>
+  <category>quarto</category>
+  <category>pdf</category>
+  <category>debugging</category>
   <guid>https://chendaniely.github.io/genai-learning-moments/posts/2026-08-17-wrong-engine-not-wrong-font.html</guid>
   <pubDate>Mon, 17 Aug 2026 00:00:00 GMT</pubDate>
 </item>
@@ -2568,6 +2607,9 @@ font-style: inherit;">fi</span></span></code></pre></div></div>
   <category>claude</category>
   <category>learning</category>
   <category>ai-collaboration</category>
+  <category>security</category>
+  <category>shell</category>
+  <category>teaching</category>
   <guid>https://chendaniely.github.io/genai-learning-moments/posts/2026-08-15-consent-not-redaction.html</guid>
   <pubDate>Sat, 15 Aug 2026 00:00:00 GMT</pubDate>
 </item>
@@ -2724,6 +2766,7 @@ font-style: inherit;"># no -rf: errors if it is not empty</span></span></code></
   <category>ai-collaboration</category>
   <category>shell</category>
   <category>data-loss</category>
+  <category>claude-code</category>
   <guid>https://chendaniely.github.io/genai-learning-moments/posts/2026-07-31-rm-rf-cleanup-of-state-it-did-not-create.html</guid>
   <pubDate>Fri, 31 Jul 2026 00:00:00 GMT</pubDate>
 </item>
@@ -2902,6 +2945,8 @@ font-style: inherit;">}</span></span></code></pre></div></div>
   <category>claude</category>
   <category>learning</category>
   <category>ai-collaboration</category>
+  <category>vibe-coding</category>
+  <category>maintainability</category>
   <guid>https://chendaniely.github.io/genai-learning-moments/posts/2026-07-28-invented-knowledge-belongs-in-data.html</guid>
   <pubDate>Tue, 28 Jul 2026 00:00:00 GMT</pubDate>
 </item>
@@ -3256,6 +3301,9 @@ font-style: inherit;">|</span></span>
   <category>claude</category>
   <category>learning</category>
   <category>ai-collaboration</category>
+  <category>github</category>
+  <category>shell</category>
+  <category>over-engineering</category>
   <guid>https://chendaniely.github.io/genai-learning-moments/posts/2026-07-28-over-engineering-the-ask.html</guid>
   <pubDate>Tue, 28 Jul 2026 00:00:00 GMT</pubDate>
 </item>
@@ -3563,6 +3611,9 @@ font-style: inherit;">// only at the true outer edge</span></span></code></pre><
   <category>ai-collaboration</category>
   <category>dataviz</category>
   <category>d3</category>
+  <category>debugging</category>
+  <category>ux</category>
+  <category>vibe-coding</category>
   <guid>https://chendaniely.github.io/genai-learning-moments/posts/2026-07-20-snap-to-nearest-object.html</guid>
   <pubDate>Mon, 20 Jul 2026 00:00:00 GMT</pubDate>
 </item>
@@ -3618,6 +3669,10 @@ font-style: inherit;">// only at the true outer edge</span></span></code></pre><
   <category>claude</category>
   <category>learning</category>
   <category>ai-collaboration</category>
+  <category>docker</category>
+  <category>security</category>
+  <category>over-engineering</category>
+  <category>dotfiles</category>
   <guid>https://chendaniely.github.io/genai-learning-moments/posts/2026-07-03-compose-file-inline-config.html</guid>
   <pubDate>Fri, 03 Jul 2026 00:00:00 GMT</pubDate>
 </item>
