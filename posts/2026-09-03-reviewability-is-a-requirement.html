@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.19">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2026-09-03">
+
+<title>Learning Moment: Five Hundred Lines to Replace print – GenAI Learning Moments</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-b626d73c4c936ccc3cb08be7d45d1df6.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-7100700a5d4657facf49b32369185e6d.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-90b0ccabdf50233fb893b00cd6e33405.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../site_libs/bootstrap/bootstrap-7100700a5d4657facf49b32369185e6d.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">GenAI Learning Moments</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../about.html"> 
+<span class="menu-text">About</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="../index.xml"> <i class="bi bi-rss" role="img" aria-label="RSS feed">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/chendaniely/genai-learning-moments"> <i class="bi bi-github" role="img" aria-label="GitHub repository">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#context" id="toc-context" class="nav-link active" data-scroll-target="#context">Context</a></li>
+  <li><a href="#the-initial-ask" id="toc-the-initial-ask" class="nav-link" data-scroll-target="#the-initial-ask">The Initial Ask</a></li>
+  <li><a href="#claudes-initial-response" id="toc-claudes-initial-response" class="nav-link" data-scroll-target="#claudes-initial-response">Claude’s Initial Response</a></li>
+  <li><a href="#the-exchange" id="toc-the-exchange" class="nav-link" data-scroll-target="#the-exchange">The Exchange</a></li>
+  <li><a href="#the-final-solution" id="toc-the-final-solution" class="nav-link" data-scroll-target="#the-final-solution">The Final Solution</a></li>
+  <li><a href="#the-lesson" id="toc-the-lesson" class="nav-link" data-scroll-target="#the-lesson">The Lesson</a></li>
+  <li><a href="#postscript-retracting-your-own-request-is-a-legitimate-move" id="toc-postscript-retracting-your-own-request-is-a-legitimate-move" class="nav-link" data-scroll-target="#postscript-retracting-your-own-request-is-a-legitimate-move">Postscript: retracting your own request is a legitimate move</a></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/chendaniely/genai-learning-moments/blob/main/posts/2026-09-03-reviewability-is-a-requirement.qmd" class="toc-action"><i class="bi bi-github"></i>View source</a></li><li><a href="https://github.com/chendaniely/genai-learning-moments/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Learning Moment: Five Hundred Lines to Replace <code>print</code></h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">claude</div>
+    <div class="quarto-category">learning</div>
+    <div class="quarto-category">ai-collaboration</div>
+  </div>
+  </div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">September 3, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="context" class="level2">
+<h2 class="anchored" data-anchor-id="context">Context</h2>
+<p>A course-management script that drives a GitHub Enterprise server as an LMS: it creates a repo per student per assessment, seeds files, grants access and opens notification issues, across ~170 repos and 40 concurrent threads. Its only output was 103 bare <code>print()</code> calls to stdout. The only way to keep a record of a run was a shell redirect, and the result was unstructured prose – finding the eight students whose collaborator add failed meant grepping a 1,900-line file.</p>
+</section>
+<section id="the-initial-ask" class="level2">
+<h2 class="anchored" data-anchor-id="the-initial-ask">The Initial Ask</h2>
+<blockquote class="blockquote">
+<p>“in a separate branch so i can rebase it against main. can you make it such that the print statements also log to a file? something that is capturing all the features that make it easy to filter through status across each of the steps? i’d like to have a csv file that we can use to help sort and look for errors and students”</p>
+</blockquote>
+<p>A clear, reasonable request with a named deliverable: a CSV you can sort and filter by status and student.</p>
+</section>
+<section id="claudes-initial-response" class="level2">
+<h2 class="anchored" data-anchor-id="claudes-initial-response">Claude’s Initial Response</h2>
+<p>Claude designed and built exactly that, thoroughly:</p>
+<ul>
+<li>a new <code>run_log.py</code> (387 lines) – stdlib logging with three handlers: stdout, a per-run <code>.log</code>, and a per-run <code>.csv</code> with 18 columns</li>
+<li>a new <code>test_run_log.py</code> (160 lines) that hammers the logger from 40 threads</li>
+<li><code>contextvars</code> carrying run/step/student/repo context, stamped onto every record by a logging <code>Filter</code>, so a helper deep in the call stack gets the right student without argument plumbing</li>
+<li><code>extra={...}</code> on 98 call sites, <code>@_repo_scope</code> decorators on 10 methods, <code>with step(...)</code> blocks at 16 sites, and <code>copy_context()</code> per threadpool task so worker threads inherit the run context</li>
+</ul>
+<p>It was correct. The test passed with 4,202 CSV rows, asserting that context propagated into pool threads and did not leak between tasks. It handled real edge cases: pandas <code>NaN</code> in roster rows, filename sanitising, a per-row flush so a killed run still leaves a usable file.</p>
+<p>Transplanted onto the target branch it came to <strong>+507/−135 in <code>main.py</code></strong>, plus 547 lines in two new files.</p>
+</section>
+<section id="the-exchange" class="level2">
+<h2 class="anchored" data-anchor-id="the-exchange">The Exchange</h2>
+<p><strong>Turn 1 — User:</strong></p>
+<blockquote class="blockquote">
+<p>“why does the run_log.py file exist?”</p>
+</blockquote>
+<p><strong>Turn 1 — Claude:</strong> Explained the design, and volunteered that the CSV was “a choice, not a necessity” worth questioning in review – while also disclaiming authorship, on the grounds that a different session had written it.</p>
+<p><strong>Turn 2 — User:</strong></p>
+<blockquote class="blockquote">
+<p>“you did write it in the work/plan/implmeentation process. you might be able to see it in a different conversation in this repo outside the worktree”</p>
+</blockquote>
+<p><strong>Turn 2 — Claude:</strong> Found the original design session on disk and read it back. Two corrections followed: the work <em>was</em> Claude’s, and the CSV had been the user’s explicit opening request, not a flourish – so the “question it in review” advice was wrong and got retracted.</p>
+<p><strong>Turn 3 — User:</strong></p>
+<blockquote class="blockquote">
+<p>“we assume we run all the main.py from the githublms root. is there a way to not have that file and test file?”</p>
+</blockquote>
+<p><strong>Turn 3 — Claude:</strong> Argued the module should stay separate: a sibling module raises at import time unless the cwd is the repo root, so keeping <code>run_log.py</code> standalone was what made it testable without the full dependency stack.</p>
+<p><strong>Turn 4 — User:</strong></p>
+<blockquote class="blockquote">
+<p>“nobody runs this in a notebook. we run it as python main.py (or later uv run python main.py …)”</p>
+</blockquote>
+<p><strong>Turn 4 — Claude:</strong> Conceded. The module’s import-safety guarantee – install no handlers, touch no filesystem on import – existed to protect <code>import main</code> from a notebook, a caller that does not exist. The test verifying that guarantee was testing a promise nothing depended on. Two more pieces fell out as dead on a CLI-only path: an <code>ensure_configured()</code> that existed for repeated calls in one notebook interpreter, and a <code>shutdown()</code> documented as “test/notebook convenience only”.</p>
+<p><strong>Turn 5 — User:</strong></p>
+<blockquote class="blockquote">
+<p>“yeah remove the run_log.py and the corresponding test file. i’m still unsure how the logging is not accurate”</p>
+</blockquote>
+<p><strong>Turn 5 — Claude:</strong> Answered the second half with two runnable demonstrations rather than an assertion. Without <code>copy_context()</code>, every threaded row lost its run identity; with a leaked context on a reused pool thread, a failure row was attributed to the <em>wrong student</em> – the console said only <code>ERROR: could not add collaborator</code>, and the file named a student whose add had succeeded. Then inlined the module and deleted both files.</p>
+<p><strong>Turn 6 — User:</strong></p>
+<blockquote class="blockquote">
+<p>“if we ened to we can forgo the print statements in lieu of a logging statement, this way it shows up on the screen + file the same way, we don’t need the csv file”</p>
+</blockquote>
+<p><strong>Turn 6 — Claude:</strong> Flagged that this reversed the original ask, offered three shapes, and built the chosen one: the structured fields moved from CSV columns into a <code>key=value</code> prefix on each log line, so <code>grep 'status=failed'</code> replaced the pandas filter. One file per run instead of two.</p>
+<p><strong>Turn 7 — User:</strong></p>
+<blockquote class="blockquote">
+<p>“ok but now all you did was move that code into main.py. why is the diff more complicated than just the logger.info() bits? why are there so many new functions? can we minimize the diff in this PR?”</p>
+</blockquote>
+<p><strong>Turn 7 — Claude:</strong> Measured instead of explaining. Of 507 added lines only <strong>108</strong> were the actual <code>print</code> → <code>logger</code> conversion. And of the 86 log calls carrying a status, <strong>49 already named the student or repo in the message text</strong>, while the 37 that did not were run-level lines with no student subject at all. The context machinery was largely duplicating identifiers the messages already contained. Stripped it: 11 <code>ContextVar</code>s, <code>_bind</code>, <code>student_ctx</code>, <code>repo_ctx</code>, <code>step</code>, <code>ContextFilter</code>, the loop wrappers, the decorators, and 15 <code>with</code> blocks. Down to +340/−110.</p>
+<p><strong>Turn 8 — User:</strong></p>
+<blockquote class="blockquote">
+<p>“i think we can simplify this a lot by removing the extras bit, and the run level and context managers? we dont’ need that. let’s start over and do a very minimal pass of logging. this will make it easier to review we can add fanciness later. i take back my intial request it was too much new things that I can’t review”</p>
+</blockquote>
+<p><strong>Turn 8 — Claude:</strong> Pushed the existing work to an archive branch so nothing was destroyed, reset to <code>origin/main</code>, and rebuilt from scratch as a single commit.</p>
+<p><strong>Turn 9 — User:</strong></p>
+<blockquote class="blockquote">
+<p>“i was expecting all the print statements to be replaced by logging. in the print statements let’s also keep the WARNING ERROR text in the text as well. so it’s a light touch on the diff”</p>
+</blockquote>
+<p><strong>Turn 9 — Claude:</strong> Made it a pure mechanical substitution – message text untouched, including the messages that label themselves “Warning:” or “FAILED”, so the level is additional rather than a replacement. Level per call site from one stated rule instead of 103 judgement calls.</p>
+<p><strong>Turn 10 — User:</strong></p>
+<blockquote class="blockquote">
+<p>“the KEYERROR should be flagged as ERROR in the log not INFO”</p>
+</blockquote>
+<p><strong>Turn 10 — Claude:</strong> Fixed it, then treated it as a rule defect rather than a typo: the rule keys off the <em>first word</em>, so it misses any message whose signal sits later. Audited every remaining <code>logger.info</code> for problem wording anywhere in the text, found 15 candidates, and proposed the 5 genuine siblings – while noting that the “already exists … skipping” family is normal idempotent behaviour and should stay INFO.</p>
+<p><strong>Turn 11 — User:</strong></p>
+<blockquote class="blockquote">
+<p>“promote”</p>
+</blockquote>
+<p><strong>Turn 11 — Claude:</strong> Applied them. While verifying, noticed the PR had grown a fourth file: an unrelated dependency-file edit swept in by <code>git add -A</code> without checking <code>git status</code> first. Rebuilt the commits without it.</p>
+<p><strong>Turn 12 — User:</strong></p>
+<blockquote class="blockquote">
+<p>“finally in the print statement are we able to easily add the timestamp and log status in the print statement without too much changes?”</p>
+<p>“2026-09-03 23:13:11 INFO”</p>
+</blockquote>
+<p><strong>Turn 12 — Claude:</strong> One line: point the console handler at the same formatter as the file.</p>
+<p><strong>Turn 13 — User:</strong></p>
+<blockquote class="blockquote">
+<p>“ok this looks good much simplier and easier to review”</p>
+</blockquote>
+</section>
+<section id="the-final-solution" class="level2">
+<h2 class="anchored" data-anchor-id="the-final-solution">The Final Solution</h2>
+<p>Three files, four commits, <strong>+156/−105</strong> – of which 103 added lines are the converted calls themselves:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> setup_logging(mode<span class="op">=</span><span class="va">None</span>, course<span class="op">=</span><span class="va">None</span>, name<span class="op">=</span><span class="va">None</span>, log_dir<span class="op">=</span>LOG_DIR):</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    logger.setLevel(logging.DEBUG)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    logger.propagate <span class="op">=</span> <span class="va">False</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    formatter <span class="op">=</span> logging.Formatter(<span class="st">"</span><span class="sc">%(asctime)s</span><span class="st"> </span><span class="sc">%(levelname)-7s</span><span class="st"> </span><span class="sc">%(message)s</span><span class="st">"</span>,</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>                                  datefmt<span class="op">=</span><span class="st">"%Y-%m-</span><span class="sc">%d</span><span class="st"> %H:%M:%S"</span>)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    console <span class="op">=</span> logging.StreamHandler(sys.stdout)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    console.setFormatter(formatter)</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    logger.addHandler(console)</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    os.makedirs(log_dir, exist_ok<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    stem <span class="op">=</span> <span class="st">"_"</span>.join(<span class="bu">str</span>(part) <span class="cf">for</span> part <span class="kw">in</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>                    (datetime.now().strftime(<span class="st">"%Y%m</span><span class="sc">%d</span><span class="st">T%H%M%S"</span>), mode, course, name) <span class="cf">if</span> part)</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>    path <span class="op">=</span> os.path.join(log_dir, re.sub(<span class="vs">r"</span><span class="pp">[^</span><span class="dv">\w</span><span class="pp">.-]</span><span class="vs">"</span>, <span class="st">"_"</span>, stem) <span class="op">+</span> <span class="st">".log"</span>)</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>    log_file <span class="op">=</span> logging.FileHandler(path, mode<span class="op">=</span><span class="st">"w"</span>, encoding<span class="op">=</span><span class="st">"utf-8"</span>)</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>    log_file.setFormatter(formatter)</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>    logger.addHandler(log_file)</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>    logger.info(<span class="st">"Logging this run to </span><span class="sc">%s</span><span class="st">"</span>, path)</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> path</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Everything else is <code>print(</code> → <code>logger.info(</code> / <code>logger.warning(</code> / <code>logger.error(</code>, message text unchanged.</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th></th>
+<th>first version</th>
+<th>shipped</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>new files</td>
+<td>2 (547 lines)</td>
+<td>0</td>
+</tr>
+<tr class="even">
+<td><code>main.py</code></td>
+<td>+507/−135</td>
+<td>+154/−104</td>
+</tr>
+<tr class="odd">
+<td>of which, the actual conversion</td>
+<td>108</td>
+<td>103</td>
+</tr>
+<tr class="even">
+<td>new functions/classes</td>
+<td>20</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+<p>The discarded version was pushed to an archive branch and linked from the pull request, so the structured logging remains available as a later increment.</p>
+</section>
+<section id="the-lesson" class="level2">
+<h2 class="anchored" data-anchor-id="the-lesson">The Lesson</h2>
+<p><strong>What Claude got right:</strong> The engineering. The design solved a real problem correctly, was verified rather than asserted, and handled genuine edge cases that a quick version would have missed. The <code>contextvars</code> approach is the right way to attribute log records without threading arguments through a hundred helpers – given that you need that attribution at all. And when finally asked to justify the size, Claude measured rather than argued: the 108-of-507 ratio and the 49-of-86 finding are what ended the debate, and both were cheap to compute at any point.</p>
+<p><strong>What required human expertise:</strong> Knowing that <strong>reviewability is a hard requirement, not a nice-to-have</strong>. The user reviews line by line on a pull request; a diff he cannot check is a diff he cannot merge, so a large correct change is worth less to him than a small one he can approve today. He also knew things about his own project that no amount of reading the code would reveal – nobody imports this module, nobody runs it from a notebook, it is always invoked from the repo root – and each of those facts demolished one of Claude’s justifications for the extra structure.</p>
+<p><strong>Why Claude missed it:</strong></p>
+<ol type="1">
+<li><p><em>Optimised for the stated feature, not the delivery constraint.</em> “I’d like a CSV to filter by status and student” was read as a specification to satisfy completely. The clause before it – “in a separate branch so i can rebase it against main” – said this had to land as a reviewable change, and that got treated as logistics rather than as a design constraint with teeth.</p></li>
+<li><p><em>Every addition was locally justified, so the total was never questioned.</em> Context propagation solves a real problem. Per-row flush protects a killed run. NaN coercion handles actual roster data. No individual step felt excessive, so complexity accreted without ever reaching a point where Claude asked whether the whole apparatus was worth its review cost.</p></li>
+<li><p><em>Never measured the thing it was building.</em> The killer fact – that 49 of 86 messages already named the student, making the attribution machinery largely redundant – took one script to establish, and Claude only ran it when asked in turn 7. It could have been run before writing a line. Building the machinery first and checking its value never is the wrong order.</p></li>
+<li><p><em>Verification created false confidence.</em> A 4,202-row passing test made the machinery feel earned. But a test proves code is <em>correct</em>, never that it should <em>exist</em>, and demonstrating that an unnecessary abstraction works makes it harder to delete, not easier.</p></li>
+<li><p><em>Defended three times before measuring once.</em> Asked why the module existed, Claude gave a reason (cwd dependence); knocked down, it gave another (dependency-free testing); knocked down, another (import safety). Each was true in general and irrelevant here. Reasoning from software-engineering principles instead of from this project’s actual usage produced three confident answers that a single question about how the tool is run invalidated.</p></li>
+<li><p><em>Framing as a transplant suppressed the question.</em> This session’s job was “cherry-pick these commits onto main,” so the existing design was treated as a given to be preserved through 20 merge conflicts. A task framed as moving work makes it unnatural to ask whether the work should land at all – but that was the question worth asking on conflict number one.</p></li>
+</ol>
+<p><strong>Key takeaway:</strong> Before building, ask what the reviewer has to be able to check, and size the change to fit – then count how many of your added lines are the actual change versus machinery supporting it, and cut if the machinery wins. A small correct change that merges today beats a complete one that stalls in review.</p>
+</section>
+<section id="postscript-retracting-your-own-request-is-a-legitimate-move" class="level2">
+<h2 class="anchored" data-anchor-id="postscript-retracting-your-own-request-is-a-legitimate-move">Postscript: retracting your own request is a legitimate move</h2>
+<p>The turn that unblocked this was the user withdrawing his own opening ask: <em>“i take back my intial request it was too much new things that I can’t review.”</em> Nothing about the original request was unreasonable, and the thing built from it worked. It was still right to abandon it, because the constraint that mattered only became visible once the diff existed.</p>
+<p>Two habits made that cheap. The discarded work went to an archive branch rather than the bin, so “we can add fanciness later” stayed true rather than becoming a consolation. And the rebuild started from <code>origin/main</code> rather than trying to subtract the machinery from the existing branch – starting over was less work, and produced a cleaner history, than unwinding it commit by commit.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/chendaniely\.github\.io\/genai-learning-moments\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p>Content is <a href="https://github.com/chendaniely/genai-learning-moments/blob/main/LICENSE">CC0 1.0</a>. Built with <a href="https://quarto.org">Quarto</a>.</p>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/chendaniely/genai-learning-moments/blob/main/posts/2026-09-03-reviewability-is-a-requirement.qmd" class="toc-action"><i class="bi bi-github"></i>View source</a></li><li><a href="https://github.com/chendaniely/genai-learning-moments/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

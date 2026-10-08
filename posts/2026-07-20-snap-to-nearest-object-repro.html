@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chord-wheel hover: exact-hit (buggy) vs snap-to-nearest (fixed)</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; color: #222; line-height: 1.5; }
+  h1 { font-size: 1.3rem; }
+  .controls { margin: 1rem 0; padding: 0.75rem 1rem; background: #f5f3ee; border-radius: 6px; }
+  .controls label { margin-right: 1.5rem; cursor: pointer; }
+  .readout { font-family: ui-monospace, monospace; color: #555; min-height: 1.4em; }
+  svg { width: 100%; max-width: 520px; display: block; margin: 0 auto; }
+
+  /* Hover styling is identical for both modes — only the *hit-testing* differs. */
+  .ribbon { opacity: 0.55; transition: opacity 140ms ease; }
+  .arc    { transition: opacity 140ms ease; }
+  g.wheel.dimming .ribbon:not(.hot) { opacity: 0.05; }
+  g.wheel.dimming .arc:not(.hot)    { opacity: 0.25; }
+  .ribbon.hot { opacity: 0.95; }
+  .wheel-hit  { fill: transparent; }
+
+  /* Buggy mode keeps per-element listeners on the shapes themselves. */
+  .mode-exact .ribbon, .mode-exact .arc { pointer-events: auto; cursor: pointer; }
+  /* Fixed mode routes everything through the transparent backing disc. */
+  .mode-snap .ribbon, .mode-snap .arc { pointer-events: none; }
+  .mode-snap .wheel-hit { cursor: pointer; }
+  .mode-exact .wheel-hit { pointer-events: none; }
+</style>
+</head>
+<body>
+<h1>Chord-wheel hover: exact-hit vs snap-to-nearest</h1>
+<p>
+  A miniature of the "A Dictionary of Color Combinations" wheel. Both modes
+  render the <em>same</em> shapes and dim the <em>same</em> way on hover — the
+  only difference is <strong>how the cursor decides what it's pointing at</strong>.
+  Move your mouse slowly across the lines inside the circle in each mode.
+</p>
+<div class="controls">
+  <label><input type="radio" name="mode" value="exact" checked> Exact hit-testing (buggy — flashes in the gaps)</label>
+  <label><input type="radio" name="mode" value="snap"> Snap to nearest (fixed — glides)</label>
+  <div class="readout" id="readout">hovering: —</div>
+</div>
+<svg id="wheel" viewBox="-420 -420 840 840" role="img" aria-label="Interactive chord wheel demo"></svg>
+<p style="color:#666;font-size:0.9rem">
+  In <strong>exact</strong> mode, whenever your cursor is between two ribbons it
+  is over <em>nothing</em> — the group's <code>mouseleave</code> fires, the dim
+  clears, and the whole wheel flashes back to full opacity until you land on the
+  next line. In <strong>snap</strong> mode a transparent backing disc means the
+  cursor is always "within" the wheel, and the highlighted object is chosen by
+  <em>geometry</em> (nearest ribbon via <code>d3.Delaunay</code>, or the arc at
+  that angle) — so there are no dead gaps to flash on.
+</p>
+
+<script>
+const SIZE = 840, OUTER = 340, INNER = 310, RIBBON_R = INNER - 2, HIT_R = OUTER + 30
+const TAU = 2 * Math.PI
+const N = 12
+
+// Deterministic symmetric matrix — some zero cells so there are real gaps.
+const matrix = Array.from({ length: N }, () => new Array(N).fill(0))
+for (let i = 0; i < N; i++) {
+  for (let j = i + 1; j < N; j++) {
+    const v = (i * 3 + j * 7) % 4        // 0..3; the 0s leave gaps
+    matrix[i][j] = v; matrix[j][i] = v
+  }
+}
+const colorOf = (i) => d3.hsl((i / N) * 360, 0.55, 0.6).formatHex()
+
+const svg = d3.select('#wheel')
+const readout = document.getElementById('readout')
+const layout = d3.chord().padAngle(0.03).sortSubgroups(d3.descending)(matrix)
+
+// --- static render (shared by both modes) --------------------------------
+const g = svg.append('g').attr('class', 'wheel').attr('transform', 'rotate(-4)')
+const gNode = g.node()
+g.append('circle').attr('class', 'wheel-hit').attr('r', HIT_R)
+
+const arcGen = d3.arc().innerRadius(INNER).outerRadius(OUTER)
+const ribbonGen = d3.ribbon().radius(RIBBON_R)
+
+const ribbons = g.append('g').selectAll('path').data(layout).join('path')
+  .attr('class', 'ribbon').attr('d', ribbonGen).attr('fill', d => colorOf(d.source.index))
+const ribbonNodes = ribbons.nodes()
+
+const arcs = g.append('g').selectAll('path').data(layout.groups).join('path')
+  .attr('class', 'arc').attr('d', arcGen).attr('fill', d => colorOf(d.index))
+const arcNodes = arcs.nodes()
+
+// --- shared highlight primitives -----------------------------------------
+let hoverKey = null, hotEls = []
+function setHot(els) {
+  for (const el of hotEls) el.classList.remove('hot')
+  hotEls = els
+  for (const el of hotEls) el.classList.add('hot')
+}
+function clearHover() {
+  hoverKey = null; gNode.classList.remove('dimming'); setHot([]); readout.textContent = 'hovering: —'
+}
+function showRibbon(el, d) {
+  const key = `r${d.source.index}-${d.target.index}`
+  if (key === hoverKey) return
+  hoverKey = key; gNode.classList.add('dimming')
+  setHot([el, arcNodes[d.source.index], arcNodes[d.target.index]])
+  readout.textContent = `hovering: ribbon ${d.source.index} × ${d.target.index}`
+}
+function showArc(el, d) {
+  const key = `a${d.index}`
+  if (key === hoverKey) return
+  hoverKey = key; gNode.classList.add('dimming')
+  const hot = [el]
+  layout.forEach((r, k) => { if (r.source.index === d.index || r.target.index === d.index) hot.push(ribbonNodes[k]) })
+  setHot(hot)
+  readout.textContent = `hovering: node ${d.index}`
+}
+
+// --- MODE 1: exact hit-testing (the bug) ---------------------------------
+// Per-element listeners. mouseleave fires the instant the cursor enters a
+// gap between shapes, so the dim clears and the wheel flashes to full view.
+function bindExact() {
+  ribbons.on('mouseenter', function (_e, d) { showRibbon(this, d) })
+    .on('mouseleave', clearHover)
+  arcs.on('mouseenter', function (_e, d) { showArc(this, d) })
+    .on('mouseleave', clearHover)
+  g.on('.pointer', null)   // detach the snap handlers
+}
+
+// --- MODE 2: snap to nearest (the fix) -----------------------------------
+// One transparent backing disc + geometry. The cursor POSITION decides the
+// nearest object; state is keyed so it only changes when the nearest changes.
+const pts = [], ribbonByPoint = []
+layout.forEach((d, k) => {
+  const a0 = (d.source.startAngle + d.source.endAngle) / 2
+  const a1 = (d.target.startAngle + d.target.endAngle) / 2
+  const p0 = [RIBBON_R * Math.sin(a0), -RIBBON_R * Math.cos(a0)]
+  const p1 = [RIBBON_R * Math.sin(a1), -RIBBON_R * Math.cos(a1)]
+  for (let s = 0; s <= 8; s++) {           // sample the centerline (Bézier through origin)
+    const t = s / 8, w0 = (1 - t) ** 2, w1 = t ** 2
+    pts.push([w0 * p0[0] + w1 * p1[0], w0 * p0[1] + w1 * p1[1]]); ribbonByPoint.push(k)
+  }
+})
+const delaunay = d3.Delaunay.from(pts)
+const normAngle = a => ((a % TAU) + TAU) % TAU
+function arcAtAngle(theta) {
+  let best = 0, bestGap = Infinity
+  for (const grp of layout.groups) {
+    if (theta >= grp.startAngle && theta <= grp.endAngle) return grp
+    const gap = Math.min(Math.abs(theta - grp.startAngle), Math.abs(theta - grp.endAngle))
+    if (gap < bestGap) { bestGap = gap; best = grp.index }
+  }
+  return layout.groups[best]
+}
+function bindSnap() {
+  ribbons.on('mouseenter', null).on('mouseleave', null)
+  arcs.on('mouseenter', null).on('mouseleave', null)
+  let findHint = 0
+  g.on('pointermove.pointer', (event) => {
+    const [x, y] = d3.pointer(event, gNode)
+    if (Math.hypot(x, y) >= INNER) {
+      const d = arcAtAngle(normAngle(Math.atan2(x, -y)))
+      showArc(arcNodes[d.index], d)
+    } else {
+      findHint = delaunay.find(x, y, findHint)
+      const d = layout[ribbonByPoint[findHint]]
+      showRibbon(ribbonNodes[ribbonByPoint[findHint]], d)
+    }
+  }).on('pointerleave.pointer', clearHover)
+}
+
+function setMode(mode) {
+  clearHover()
+  svg.attr('class', mode === 'snap' ? 'mode-snap' : 'mode-exact')
+  if (mode === 'snap') bindSnap(); else bindExact()
+}
+document.querySelectorAll('input[name=mode]').forEach(r =>
+  r.addEventListener('change', e => setMode(e.target.value)))
+setMode('exact')
+</script>
+</body>
+</html>

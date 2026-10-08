@@ -1,0 +1,34 @@
+[
+  {
+    "listing": "/index.html",
+    "items": [
+      "/posts/2026-10-08-guard-dont-warn.html",
+      "/posts/2026-10-07-summaries-lose-the-argument.html",
+      "/posts/2026-10-07-use-the-framework-first.html",
+      "/posts/2026-09-13-teachable-beats-correct.html",
+      "/posts/2026-09-03-fix-belongs-in-the-wrapper.html",
+      "/posts/2026-09-03-reviewability-is-a-requirement.html",
+      "/posts/2026-08-26-introduce-before-you-rely-on-it.html",
+      "/posts/2026-08-26-venv-is-a-module.html",
+      "/posts/2026-08-17-checker-deletes-its-output.html",
+      "/posts/2026-08-17-install-dont-borrow-pandoc.html",
+      "/posts/2026-08-17-makefile-is-an-interface.html",
+      "/posts/2026-08-17-when-the-harness-lies.html",
+      "/posts/2026-08-17-which-characters-to-test.html",
+      "/posts/2026-08-17-wrong-engine-not-wrong-font.html",
+      "/posts/2026-08-15-consent-not-redaction.html",
+      "/posts/2026-07-31-rm-rf-cleanup-of-state-it-did-not-create.html",
+      "/posts/2026-07-28-invented-knowledge-belongs-in-data.html",
+      "/posts/2026-07-28-over-engineering-the-ask.html",
+      "/posts/2026-07-20-snap-to-nearest-object.html",
+      "/posts/2026-07-03-compose-file-inline-config.html",
+      "/posts/2026-06-25-slide-title-text-contrast.html",
+      "/posts/2026-06-19-docs-single-source-of-truth.html",
+      "/posts/2026-06-19-file-state-needs-reset-mode.html",
+      "/posts/2026-06-19-skill-defaults-vs-project-context.html",
+      "/posts/2026-06-19-specific-filenames-over-phase-names.html",
+      "/posts/2026-06-19-systemctl-restart-kills-session.html",
+      "/posts/2026-06-17-git-history-is-permanent.html"
+    ]
+  }
+]
