@@ -2945,8 +2945,8 @@ font-style: inherit;">}</span></span></code></pre></div></div>
   <category>claude</category>
   <category>learning</category>
   <category>ai-collaboration</category>
-  <category>vibe-coding</category>
   <category>maintainability</category>
+  <category>plan-review</category>
   <guid>https://chendaniely.github.io/genai-learning-moments/posts/2026-07-28-invented-knowledge-belongs-in-data.html</guid>
   <pubDate>Tue, 28 Jul 2026 00:00:00 GMT</pubDate>
 </item>
@@ -3613,7 +3613,6 @@ font-style: inherit;">// only at the true outer edge</span></span></code></pre><
   <category>d3</category>
   <category>debugging</category>
   <category>ux</category>
-  <category>vibe-coding</category>
   <guid>https://chendaniely.github.io/genai-learning-moments/posts/2026-07-20-snap-to-nearest-object.html</guid>
   <pubDate>Mon, 20 Jul 2026 00:00:00 GMT</pubDate>
 </item>
@@ -3673,6 +3672,7 @@ font-style: inherit;">// only at the true outer edge</span></span></code></pre><
   <category>security</category>
   <category>over-engineering</category>
   <category>dotfiles</category>
+  <category>plan-review</category>
   <guid>https://chendaniely.github.io/genai-learning-moments/posts/2026-07-03-compose-file-inline-config.html</guid>
   <pubDate>Fri, 03 Jul 2026 00:00:00 GMT</pubDate>
 </item>
