@@ -1,7 +1,7 @@
 ---
 title: "Learning Moment: A Program, or a Module?"
 date: 2026-08-26
-categories: [claude, learning, ai-collaboration]
+categories: [claude, learning, ai-collaboration, teaching, writing, python]
 ---
 
 ## Context

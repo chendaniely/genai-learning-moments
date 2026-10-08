@@ -1,7 +1,7 @@
 ---
 title: "Learning Moment: Consent Is Not the Same as Redaction"
 date: 2026-08-15
-categories: [claude, learning, ai-collaboration]
+categories: [claude, learning, ai-collaboration, security, shell, teaching]
 ---
 
 ## Context

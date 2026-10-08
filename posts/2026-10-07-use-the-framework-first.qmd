@@ -1,7 +1,7 @@
 ---
 title: "Learning Moment: A Hand-Built Card Where a Quarto Callout Would Do"
 date: 2026-10-07
-categories: [claude, learning, ai-collaboration]
+categories: [claude, learning, ai-collaboration, quarto, css, over-engineering]
 ---
 
 ## Context

@@ -1,7 +1,7 @@
 ---
 title: "Learning Moment: Five Hundred Lines to Replace `print`"
 date: 2026-09-03
-categories: [claude, learning, ai-collaboration]
+categories: [claude, learning, ai-collaboration, python, refactoring, over-engineering]
 ---
 
 ## Context

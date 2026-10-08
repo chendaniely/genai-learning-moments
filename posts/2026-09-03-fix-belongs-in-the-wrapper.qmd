@@ -1,7 +1,7 @@
 ---
 title: "Learning Moment: A New Function One Underscore From the Old One"
 date: 2026-09-03
-categories: [claude, learning, ai-collaboration]
+categories: [claude, learning, ai-collaboration, python, github, refactoring, maintainability]
 ---
 
 ## Context

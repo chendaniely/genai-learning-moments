@@ -1,7 +1,7 @@
 ---
 title: "Learning Moment: A Correct Repro That Nobody Can Teach"
 date: 2026-09-13
-categories: [claude, learning, ai-collaboration]
+categories: [claude, learning, ai-collaboration, teaching, git, writing]
 ---
 
 ## Context

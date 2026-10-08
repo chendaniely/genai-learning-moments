@@ -1,7 +1,7 @@
 ---
 title: "Learning Moment: When the Hover Still Twitches, Question the Hit-Test, Not the Event Plumbing"
 date: 2026-07-20
-categories: [claude, learning, ai-collaboration, dataviz, d3]
+categories: [claude, learning, ai-collaboration, dataviz, d3, debugging, ux, vibe-coding]
 ---
 
 ## Context

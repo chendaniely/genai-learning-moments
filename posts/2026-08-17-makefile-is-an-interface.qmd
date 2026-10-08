@@ -1,7 +1,7 @@
 ---
 title: "Learning Moment: A Makefile Is an Interface, Not Just a Build Graph"
 date: 2026-08-17
-categories: [claude, learning, ai-collaboration]
+categories: [claude, learning, ai-collaboration, ux, teaching, maintainability]
 ---
 
 ## Context

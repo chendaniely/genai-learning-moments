@@ -1,7 +1,7 @@
 ---
 title: "Learning Moment: Knowing Which Characters to Test"
 date: 2026-08-17
-categories: [claude, learning, ai-collaboration]
+categories: [claude, learning, ai-collaboration, testing, pdf]
 ---
 
 ## Context

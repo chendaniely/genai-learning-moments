@@ -18,7 +18,9 @@ This file holds what is specific to this repository; where it differs from the s
 - **Put it in `posts/`**, named `YYYY-MM-DD-<slug>.qmd`. A file at the repo root is not rendered.
 - **Front matter:** `title` ("Learning Moment: …"), `date` and `categories`, as in the template.
   The listing sorts by `date` and filters by `categories`, so keep all three.
-  Start `categories` with `[claude, learning, ai-collaboration]` and add topic tags only when they help someone filter (`git`, `security`, `quarto`).
+  Start `categories` with `[claude, learning, ai-collaboration]`, then add every topic tag that fits:
+  the tools in play (`quarto`, `python`, `git`, `shell`), the kind of lesson (`over-engineering`, `debugging`, `testing`, `security`), and the material (`teaching`, `writing`, `documentation`).
+  Reuse tags already in use (`grep -h '^categories:' posts/*.qmd`); add a new one only when none fits.
 - **Companion files** (a repro page, an image) go in `posts/` beside the post, named after it (`<post-name>-repro.html`), and are linked by relative path.
   Quarto copies linked files into the site.
 - **Link other moments by relative `.qmd` path**, for example `[venv is a module](2026-08-26-venv-is-a-module.qmd)`.
