@@ -6,7 +6,7 @@ categories: [claude, learning, ai-collaboration, git, security]
 
 ## Context
 
-Working on a personal dotfiles repo (`mac-heartsbane`) containing shell scripts
+Working on a personal dotfiles repo (`mac-laptop`) containing shell scripts
 and LaunchAgents that auto-mount an encrypted SD card and a NAS.
 The repo was about to be pushed to GitHub as a private repository,
 with a discussion about what would need to change if it ever went public.
@@ -28,7 +28,7 @@ containing a table that listed the actual sensitive values alongside their file 
 | Item | Value | Files |
 |------|-------|-------|
 | NAS Tailscale IP | `100.123.45.67` | `mount_nas.sh`, `AGENTS.md`, `Makefile` |
-| NAS local IP | `192.168.1.50` | `mount_nas.sh`, `AGENTS.md`, `Makefile` |
+| NAS local IP | `192.168.1.XXX` | `mount_nas.sh`, `AGENTS.md`, `Makefile` |
 | NAS SMB username | `john.doe` | `mount_nas.sh`, `AGENTS.md`, `Makefile` |
 | SD card UUID | `AAAA1111-BBBB-2222-CCCC-333344445555` | `remount_sdcard.sh`, `AGENTS.md` |
 | Local username | `alice` | `remount_sdcard.sh`, `mount_nas.sh`, plists |

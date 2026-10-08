@@ -7,7 +7,7 @@ categories: [claude, learning, ai-collaboration]
 ## Context
 
 Setting up a new machine directory in a dotfiles repo.
-The repo organizes everything by machine (`mac-heartsbane/`, `system76-blackfyre/`, etc.),
+The repo organizes everything by machine (`mac-laptop/`, `linux-laptop/`, etc.),
 so each machine directory is self-contained.
 Claude was following the brainstorming skill,
 which instructs it to save design specs to `docs/superpowers/specs/` at the repo root.
@@ -39,12 +39,12 @@ Claude was following the skill's default path literally:
 Agreed immediately.
 The spec describes a single machine's setup,
 so it belongs inside that machine's directory, not at the repo root.
-Redirected to `system76-blackfyre/docs/2026-06-19-<topic>-design.md`.
+Redirected to `linux-laptop/docs/2026-06-19-<topic>-design.md`.
 
 ## The Final Solution
 
 Specs for machine-specific work live inside the machine's own directory:
-`system76-blackfyre/docs/`.
+`linux-laptop/docs/`.
 The brainstorming skill's default path (`docs/superpowers/specs/`) is appropriate
 for project-wide specs but not for machine-specific ones.
 
