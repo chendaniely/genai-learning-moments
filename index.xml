@@ -12,6 +12,128 @@
 <generator>quarto-1.10.19</generator>
 <lastBuildDate>Wed, 14 Oct 2026 00:00:00 GMT</lastBuildDate>
 <item>
+  <title>Learning Moment: Pointing the Model at a Built-In: Quarto’s Lightbox</title>
+  <link>https://chendaniely.github.io/genai-learning-moments/posts/2026-10-14-point-it-at-the-builtin.html</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="context" class="level2">
+<h2 class="anchored" data-anchor-id="context">Context</h2>
+<p>A Quarto website that documents a personal local-AI stack: one home server running open models, reached from a laptop and a phone. The site is almost all documentation, and its Architecture page explains the stack mostly through Mermaid diagrams.</p>
+<p>The session’s main task was a new overview diagram for the home page. Partway through, the user raised a second problem: the biggest diagram on the Architecture page was unreadable.</p>
+</section>
+<section id="the-initial-ask" class="level2">
+<h2 class="anchored" data-anchor-id="the-initial-ask">The Initial Ask</h2>
+<p>The request arrived while Claude was still working on the overview:</p>
+<blockquote class="blockquote">
+<p>“while we’re at it. in the architecture page, the image for where everythign its is very small text. we should fix that or make the image clickable and zoomable like in an image lightbox”</p>
+</blockquote>
+</section>
+<section id="claudes-initial-response" class="level2">
+<h2 class="anchored" data-anchor-id="claudes-initial-response">Claude’s Initial Response</h2>
+<p>Claude measured the problem first. The diagram was 3,445 pixels wide, squeezed into an 800-pixel text column, so it showed at 23% of its natural size. Redrawing it left to right didn’t help (it came out 2,240 × 1,840, still about 36%): the diagram has about 25 parts, so it is simply big.</p>
+<p>Claude concluded that zoom was the real fix, and wrote one. It produced about 150 lines of dependency-free HTML, CSS and JavaScript in an include file: click a diagram, and a full-screen <code>&lt;dialog&gt;</code> opens a copy of the SVG at natural size, with −, 100%, + and Fit buttons, drag to pan, and ctrl-scroll to zoom. Claude rendered the site with it; the user’s next message arrived before it had opened the result in a browser.</p>
+<p>What Claude didn’t do was check whether Quarto already had a feature for this. It had a hunch that Quarto’s lightbox only handles images, since Quarto draws Mermaid diagrams in the browser as inline SVG, and it treated that hunch as an answer instead of looking it up.</p>
+</section>
+<section id="the-exchange" class="level2">
+<h2 class="anchored" data-anchor-id="the-exchange">The Exchange</h2>
+<p><strong>Turn 1 — User:</strong></p>
+<blockquote class="blockquote">
+<p>“quarto has a lightbox feature: https://quarto.org/docs/output-formats/html-lightbox-figures.html”</p>
+</blockquote>
+<p><strong>Turn 1 — Claude:</strong> Read the page. The hunch was right as far as it went: the lightbox only applies to images, and nothing on the page mentions diagrams. But checking turned up a route the hunch had missed. Quarto can also render Mermaid to an image at build time.</p>
+<p>Claude tested both build-time formats on a three-node diagram:</p>
+<ul>
+<li><code>mermaid-format: svg</code> still produced an inline <code>&lt;svg&gt;</code>, with no lightbox.</li>
+<li><code>mermaid-format: png</code> produced <code>&lt;a class="lightbox"&gt;&lt;img …&gt;&lt;/a&gt;</code>. The lightbox wraps it.</li>
+</ul>
+<p>Then it rendered the real Architecture page that way, in a scratch copy, and clicked through it in a browser. The lightbox opened the diagram fitted to the screen, a second click zoomed to full resolution, and dragging moved it around. Then it tried its own script on the real build for the first time, so the two could be compared on the same page.</p>
+<p>Rather than switch on its own, Claude put the choice to the user, with what each would cost:</p>
+<blockquote class="blockquote">
+<p><strong>Quarto’s lightbox (Recommended)</strong>: “Built in, so there’s no custom code to maintain. Diagrams render to PNG at build time (mermaid-format: png). … Costs: the build needs a headless Chrome … Diagram text becomes pixels, so each diagram needs a short fig-alt. The page grows by about 1.2 MB.”</p>
+<p><strong>The click-to-zoom script</strong>: “About 150 lines of plain JS in one file. Diagrams stay as inline SVG, so the text stays sharp at any zoom and stays text. … Nothing extra at build time, but it’s custom code in a docs repo.”</p>
+</blockquote>
+<p><strong>Turn 2 — User:</strong> Picked “Quarto’s lightbox (Recommended)”.</p>
+<p><strong>Turn 2 — Claude:</strong> Removed its script and switched the site to PNG diagrams. It checked how that version of Quarto finds Chrome on Linux (<code>which google-chrome</code>, then <code>which chromium-browser</code>), and that the CI runner’s image ships Google Chrome, so the build would work in CI too. Then the real pages turned up three problems the toy diagram hadn’t:</p>
+<ul>
+<li>Wrapping a diagram in a <code>.column-page</code> div stopped the lightbox from attaching to it. The cell option <code>%%| column: page</code> worked.</li>
+<li><code>fig-alt</code> never reached the image. Three variants were tried, and none produced an <code>alt</code> attribute.</li>
+<li>The overview’s PNG was cropped: its right and bottom edges were simply missing from the file.</li>
+</ul>
+<p>One test document with <code>%%| fig-width: 16</code> rendered the overview whole. On the strength of that single test, Claude asked again, and stated a fix as fact:</p>
+<blockquote class="blockquote">
+<p>“Only a per-diagram <code>%%| fig-width</code> prevents that (the site-wide setting is ignored), and that number has to grow whenever its diagram does.”</p>
+</blockquote>
+<p>It recommended the script this time, and offered the lightbox “anyway” with a per-diagram <code>fig-width</code> and a small CSS rule.</p>
+<p><strong>Turn 3 — User:</strong> Picked “Quarto’s lightbox anyway”.</p>
+<p><strong>Turn 3 — Claude:</strong> To set each diagram’s <code>fig-width</code> from evidence rather than guesses, Claude wrote a small check that flags a PNG whose drawing touches its edges. It first ran the check on the overview it knew was cropped, to see it fail, and on the <code>fig-width: 16</code> render, to see it pass. Then it ran the check on everything: four of the five diagrams were cropped at their current settings.</p>
+<p>Rendering each diagram at two widths showed the claim from Turn 2 was wrong. <code>fig-width</code> only changed the size the image was <em>displayed</em> at, the PNG came out the same, and the overview at <code>fig-width: 16</code> was cropped this time. Claude said so plainly before going any further:</p>
+<blockquote class="blockquote">
+<p>“I have to stop and correct what I told you. <strong><code>fig-width</code> doesn’t fix the crop.</strong> It only changes the size the image is displayed at. The PNG Quarto renders comes out the same size whatever <code>fig-width</code> says.”</p>
+</blockquote>
+<p>It offered three options: the script; Quarto’s lightbox on SVGs made beforehand with a pinned mermaid-cli build step; or just widening the diagrams for now.</p>
+<p><strong>Turn 4 — User:</strong></p>
+<blockquote class="blockquote">
+<p>“dragging to click and pan is okay. let’s keep the source plain text (e.g., mermaid) the output on how to view the results i’m less worried about at the moment. let’ sjust get somethign up tehre first”</p>
+</blockquote>
+<p><strong>Turn 4 — Claude:</strong> Put the script back, with the diagrams staying plain Mermaid text drawn in the browser, and turned the PNG step off.</p>
+<p><strong>Turn 5 — User:</strong> A second pointer to the tool’s own features, this time for the size problem itself:</p>
+<blockquote class="blockquote">
+<p>“looking at the image, if we use .column-screen-inset and make the image a bit smaller the image seems it will fit. i think that’s an okay compromise https://quarto.org/docs/authoring/article-layout.html”</p>
+</blockquote>
+<p><strong>Turn 5 — Claude:</strong> Set <code>%%| column: screen-inset</code> on the big diagram. On a laptop-width window it went from 23% of its natural size to 40%, and Quarto folds the page’s table of contents into an “On this page” menu while a wide figure is in view, so the two don’t collide.</p>
+<p><strong>Turn 6 — User:</strong></p>
+<blockquote class="blockquote">
+<p>“but the note to click to zoom and the note to drag seem good too (in the archetecture page)”</p>
+</blockquote>
+</section>
+<section id="the-final-solution" class="level2">
+<h2 class="anchored" data-anchor-id="the-final-solution">The Final Solution</h2>
+<ul>
+<li><p><strong>The click-to-zoom script stayed:</strong> one include file, added after the body of every page in <code>_quarto.yml</code>, with no library. Diagrams stay as Mermaid source in the <code>.qmd</code> files.</p></li>
+<li><p><strong>The biggest diagram uses Quarto’s <code>screen-inset</code> column</strong>, from the user’s pointer to the article-layout docs. The overview uses <code>page</code>.</p></li>
+<li><p><strong>The script’s header records why the built-in wasn’t used</strong>, so the next person doesn’t re-run the experiment blind:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode html code-with-copy"><code class="sourceCode html"><span id="cb1-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&lt;!-- Click or tap any Mermaid diagram to open it full-screen, at its natural size, to zoom and pan.</span></span>
+<span id="cb1-2"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">     Included after the body of every page by _quarto.yml. No library: a &lt;dialog&gt; and a copy of the SVG.</span></span>
+<span id="cb1-3"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">     Quarto's own lightbox needs mermaid-format: png, whose renders cropped wide diagrams (2026-10-14). --&gt;</span></span></code></pre></div></div></li>
+</ul>
+<p>The custom code survived, but now for a reason that was tested, written down, and chosen by the user with the alternatives in front of them.</p>
+<p>Asked afterwards whether to write this up, the user named what mattered:</p>
+<blockquote class="blockquote">
+<p>“i wanted to make sure we are learning our tools. the testing is something we would’ve done anyway, and would’ve bumped into. most important was me directeing you where to look and try first before makeing more custom stuff”</p>
+</blockquote>
+</section>
+<section id="the-lesson" class="level2">
+<h2 class="anchored" data-anchor-id="the-lesson">The Lesson</h2>
+<p><strong>What Claude got right:</strong> It measured the problem before fixing it, and its first fix worked. Once pointed at the lightbox, it didn’t simply swap one for the other. It read the docs, found the images-only limit, found the <code>mermaid-format: png</code> route that gets around it, tried that on the real page rather than a toy, and handed the decision back with each option’s costs. When its own claim turned out to be false, it built a check, watched it fail once, and retracted the claim plainly.</p>
+<p><strong>What required human expertise:</strong> Knowing the tool’s feature set. The user knew Quarto ships a lightbox, and later that its article-layout column classes could widen a figure past the text column, and linked the docs both times. That pointer changed what Claude did next: from extending its own code to testing what the tool already does. The user also made the closing judgment call: keep the diagrams as plain-text source, and ship something now.</p>
+<p><strong>Why Claude missed it:</strong> “Make it zoomable” read as an implementation task, and for a coding agent writing code is always available, so it reached for that first. It had a hunch that the lightbox wouldn’t apply, and the hunch was half right, but a hunch isn’t a lookup, and only the lookup found the PNG route. The request also arrived mid-task, so it skipped the short design step the session’s first request had gone through, and with it the moment to ask “does Quarto already do this?” Later, the same impulse to answer instead of check produced the one-test claim about <code>fig-width</code>, caught only because the next step was a check.</p>
+<p>The same habit appears in <a href="../posts/2026-10-07-use-the-framework-first.html">A Hand-Built Card Where a Quarto Callout Would Do</a>. This time the built-in lost, which makes the order the point: try the tool’s feature first, then build custom code only for a reason you can name.</p>
+<p><strong>Key takeaway:</strong> Knowing what your tools already do is how you steer an AI: name the built-in feature and link its docs, and the model switches from writing code to testing what exists, and brings the choice back to you.</p>
+
+
+</section>
+
+ ]]></description>
+  <category>claude</category>
+  <category>learning</category>
+  <category>ai-collaboration</category>
+  <category>quarto</category>
+  <category>over-engineering</category>
+  <category>testing</category>
+  <guid>https://chendaniely.github.io/genai-learning-moments/posts/2026-10-14-point-it-at-the-builtin.html</guid>
+  <pubDate>Wed, 14 Oct 2026 00:00:00 GMT</pubDate>
+</item>
+<item>
   <title>Learning Moment: Scope the Environment, Not the System</title>
   <link>https://chendaniely.github.io/genai-learning-moments/posts/2026-10-14-scope-the-env-not-the-system.html</link>
   <description><![CDATA[ 
@@ -3580,315 +3702,6 @@ font-style: inherit;">|</span></span>
   <category>over-engineering</category>
   <guid>https://chendaniely.github.io/genai-learning-moments/posts/2026-07-28-over-engineering-the-ask.html</guid>
   <pubDate>Tue, 28 Jul 2026 00:00:00 GMT</pubDate>
-</item>
-<item>
-  <title>Learning Moment: When the Hover Still Twitches, Question the Hit-Test, Not the Event Plumbing</title>
-  <link>https://chendaniely.github.io/genai-learning-moments/posts/2026-07-20-snap-to-nearest-object.html</link>
-  <description><![CDATA[ 
-
-
-
-
-
-<section id="context" class="level2">
-<h2 class="anchored" data-anchor-id="context">Context</h2>
-<p>Building an interactive visualization of Sanzo Wada’s <em>A Dictionary of Color Combinations</em> — a circular D3 chord diagram where 157 colors sit as arcs around a ring and ~1,000 ribbons connect the colors that appear together in the book’s palettes. Hovering a ribbon or arc is supposed to dim everything else so the connection stands out. The whole thing is a static site the owner maintains by directing Claude (“vibe-coded” — the owner doesn’t read the JS/CSS themselves), so the interaction has to <em>feel</em> right on the owner’s screen, which is the one place the automated tests can’t see.</p>
-<p>A runnable minimal reproduction accompanies this note: <a href="2026-07-20-snap-to-nearest-object-repro.html"><code>2026-07-20-snap-to-nearest-object-repro.html</code></a> — a small chord wheel with a toggle between the buggy “exact hit-testing” hover and the fixed “snap to nearest” hover. Open it and drag the cursor slowly across the lines inside the circle in each mode.</p>
-</section>
-<section id="the-initial-ask" class="level2">
-<h2 class="anchored" data-anchor-id="the-initial-ask">The Initial Ask</h2>
-<blockquote class="blockquote">
-<p>the wheel flickers a lot when hovering over. sometimes even flickering completely off where no wheel is seen. let’s fix the weel hover performance before i’m able to use it in a way for next iteration.</p>
-</blockquote>
-</section>
-<section id="claudes-initial-response" class="level2">
-<h2 class="anchored" data-anchor-id="claudes-initial-response">Claude’s Initial Response</h2>
-<p>Claude ran a systematic root-cause pass and found real problems in the original hover code:</p>
-<ul>
-<li>Every one of the ~1,150 ribbon and arc elements had its <strong>own</strong> <code>mouseenter</code>/<code>mouseleave</code> listener, and each fire ran a full-scene <code>classed('dimmed', …)</code> sweep over <em>all</em> ribbons and arcs with a 200 ms CSS transition. Crossing the hundreds of tiny paths under the cursor restarted every transition constantly — the flicker.</li>
-<li>Ribbon hover dimmed the <strong>entire</strong> wheel to near-invisible; since the disc interior is wall-to-wall ribbons, the wheel visually vanished whenever the cursor was inside it — the “flickering completely off.”</li>
-<li><code>mix-blend-mode: multiply</code> on all ~1,000 ribbons piled compositing cost on top.</li>
-</ul>
-<p>Claude rebuilt hover with <strong>delegated</strong> listeners (three handlers on the wheel group instead of ~1,150), <strong>keyed</strong> state so redundant events are no-ops, and dimming driven by one container class plus a small “hot” set instead of a full-scene sweep. This genuinely removed most of the flicker. But in the process Claude <em>also dropped ribbon-hover dimming entirely</em> — an over-correction, on the theory that dimming was the culprit.</p>
-</section>
-<section id="the-exchange" class="level2">
-<h2 class="anchored" data-anchor-id="the-exchange">The Exchange</h2>
-<p><strong>Turn 1 — User:</strong></p>
-<blockquote class="blockquote">
-<p>better. but now when i over over one of the lines inside the circle, it doesn’t really stand out. before at least the other colors faded out a bit. i liked that behaviour, you can see the color connections</p>
-</blockquote>
-<p><strong>Turn 1 — Claude:</strong> Conceded the over-correction. The flicker’s cause had been the event thrashing, <em>not</em> the dimming concept — and now that hover used keyed delegated events (moving between ribbons swaps state directly, never clearing then re-dimming), the “connections stand out” behavior was safe to restore. Claude brought back ribbon-hover dimming: hovering a ribbon dims the rest of the wheel and keeps that ribbon <strong>plus the two arcs it connects</strong> bright.</p>
-<p><strong>Turn 2 — User:</strong></p>
-<blockquote class="blockquote">
-<p>let’s do another thinking pass about a solution for the color wheel to make it smoother. in the colors only verion (not shades, families, groups) it still gets twitchy when i am hovering over.</p>
-<p>i think this is because sometimes as you are hovering over the inner lines you rmouse doesn’t actually land on anyplace, so it flashes back into the full wheel view. let’s have the mouse always snap to the nearest object (line inside or box outside) it hinkt his will help. what do you think? or do you think we need to use a different library?</p>
-</blockquote>
-<p><strong>Turn 2 — Claude:</strong> This diagnosis was the key that Claude’s two prior fixes had circled without grabbing. Claude confirmed the real root cause: an SVG <code>&lt;g&gt;</code> has <strong>no fill of its own</strong> — it is only “hovered” when the pointer is literally over one of its child shapes. At the Colors level the disc is ~1,000 thin ribbons <em>with gaps between them</em>, plus a hollow center. Every time the cursor slipped into a gap, it was over nothing, the group’s <code>pointerleave</code> fired, the dim cleared, and the wheel snapped back to full view — then the next ribbon re-dimmed it. That gap-flash was the residual twitch.</p>
-<p>On the library question: no switch needed. Any renderer has the same “cursor is in a gap” problem, and D3 <em>already bundles</em> <code>d3-delaunay</code> for exactly the nearest-neighbor lookup the fix requires. Claude implemented the owner’s instinct directly:</p>
-<ul>
-<li>A transparent backing disc so the pointer is always “within” the wheel and <code>pointerleave</code> only fires at the true outer edge — no interior dead zones.</li>
-<li>Hover resolves by <strong>geometry from the cursor position</strong>, not which path it lands on: outside the inner radius it snaps to the arc at that angle; inside, it snaps to the nearest ribbon via a Delaunay index of points sampled along each ribbon’s centerline.</li>
-<li>Resolution is keyed and throttled to one update per animation frame, so the highlight only changes when the nearest object changes — it glides instead of strobing. Clicks snap the same way (a click in a gap selects the nearest line or box).</li>
-</ul>
-</section>
-<section id="the-final-solution" class="level2">
-<h2 class="anchored" data-anchor-id="the-final-solution">The Final Solution</h2>
-<p>The before/after, reduced to the essential difference in <em>what counts as a hit</em>:</p>
-<p><strong>Before — exact hit-testing.</strong> Hover depends on the pointer being over an actual shape, so the gaps between shapes are dead zones that fire a clear:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode js code-with-copy"><code class="sourceCode javascript"><span id="cb1-1">ribbons</span>
-<span id="cb1-2">  <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">on</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'mouseenter'</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">,</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">function</span> (_e<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">,</span> d) {</span>
-<span id="cb1-3">    ribbons<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">classed</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'dimmed'</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">,</span> r <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">=&gt;</span> r <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">!==</span> d)          <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">// touch all ~1000 ribbons</span></span>
-<span id="cb1-4">    arcs<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">classed</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'dimmed'</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">,</span> (_a<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">,</span> i) <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">=&gt;</span> i <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">!==</span> d<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">source</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">index</span> <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&amp;&amp;</span> i <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">!==</span> d<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">target</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">index</span>)</span>
-<span id="cb1-5">  })</span>
-<span id="cb1-6">  <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">on</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'mouseleave'</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">,</span> clearHover)   <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">// fires the moment the cursor enters a gap</span></span></code></pre></div></div>
-<p><strong>After — snap to nearest.</strong> A backing disc removes the dead zones, and the cursor <em>position</em> (not the element under it) picks the nearest object:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode js code-with-copy"><code class="sourceCode javascript"><span id="cb2-1">g<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">append</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'circle'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">attr</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'class'</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">,</span> <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'wheel-hit'</span>)<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">attr</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'r'</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">,</span> HIT_R)  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">// no dead gaps</span></span>
-<span id="cb2-2"></span>
-<span id="cb2-3"><span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">// build once per render: nearest-ribbon index from centerline samples</span></span>
-<span id="cb2-4"><span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">const</span> delaunay <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> d3<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">Delaunay</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">from</span>(centerlineSamples)</span>
-<span id="cb2-5"></span>
-<span id="cb2-6">g<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">on</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'pointermove'</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">,</span> (<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">event</span>) <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">=&gt;</span> {</span>
-<span id="cb2-7">  <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">const</span> [x<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">,</span> y] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> d3<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">pointer</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">event</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">,</span> gNode)</span>
-<span id="cb2-8">  <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">const</span> nearest <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">Math</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">hypot</span>(x<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">,</span> y) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">&gt;=</span> INNER</span>
-<span id="cb2-9">    <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">?</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">arcAtAngle</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">Math</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">atan2</span>(x<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">,</span> <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-</span>y))     <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">// outside the ring: arc by angle</span></span>
-<span id="cb2-10">    <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">:</span> <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">ribbonAt</span>(delaunay<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">find</span>(x<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">,</span> y))     <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">// inside: nearest ribbon centerline</span></span>
-<span id="cb2-11">  <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">if</span> (nearest<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span><span class="at" style="color: #657422;
-background-color: null;
-font-style: inherit;">key</span> <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">===</span> hoverKey) <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">return</span>  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">// keyed → glides, never strobes</span></span>
-<span id="cb2-12">  <span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">highlight</span>(nearest)</span>
-<span id="cb2-13">})</span>
-<span id="cb2-14">g<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">.</span><span class="fu" style="color: #4758AB;
-background-color: null;
-font-style: inherit;">on</span>(<span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">'pointerleave'</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">,</span> clearHover)        <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">// only at the true outer edge</span></span></code></pre></div></div>
-<p>(One supporting detail: the wheel’s decorative tilt moved from a CSS <code>transform</code> on the <code>&lt;svg&gt;</code> onto the SVG group, so <code>d3.pointer</code>’s <code>getScreenCTM</code> math includes it and the pointer-to-angle conversion stays exact.)</p>
-</section>
-<section id="the-lesson" class="level2">
-<h2 class="anchored" data-anchor-id="the-lesson">The Lesson</h2>
-<p><strong>What Claude got right:</strong> The systematic debugging was sound and each fix was a real improvement. Claude correctly identified the event thrashing (per-element listeners doing full-scene sweeps), the pathological whole-wheel dimming, and the blend-mode cost — and the delegated, keyed rewrite removed most of the flicker. When the owner pushed back on the lost dimming, Claude correctly re-reasoned that the dimming was never the problem and restored it safely.</p>
-<p><strong>What required human expertise:</strong> The owner’s mental model of the <em>symptom</em> — “sometimes as you are hovering over the inner lines your mouse doesn’t actually land on anyplace, so it flashes back into the full wheel view.” That sentence names the true root cause (the cursor falling into gaps between shapes) and the right fix (snap to the nearest object so a hit never depends on landing exactly on a shape) in one breath. The owner also asked the sharpening meta-question — “or do you think we need to use a different library?” — which forced the correct framing: this is not a rendering-library problem at all.</p>
-<p><strong>Why Claude missed it:</strong> Claude kept optimizing the <em>mechanism</em> of hover (how events are attached and batched) while never questioning the <em>model</em> underneath it: that “hovering” means “the pointer is over a shape.” In a scene built from ~1,000 thin shapes separated by gaps, that assumption is false a large fraction of the time — but it’s invisible from the code, because the code only describes what happens <em>when</em> you’re over a shape, never what happens in the space between. Claude also had no runtime feel for the interaction; the tests all passed, and only a human moving a real cursor through the gaps could perceive that the dead space between shapes was where the bug lived. So Claude made the existing model faster and smoother twice, when the fix was to change the model — from “exact hit” to “nearest object.”</p>
-<p><strong>Key takeaway:</strong> When an interaction still twitches after you’ve smoothed the event handling, question the hit-testing model itself, not just the plumbing — “nearest object” beats “exact hit” whenever the target is made of thin shapes and gaps, and the person moving the real cursor often sees the gap before you do.</p>
-
-
-</section>
-
- ]]></description>
-  <category>claude</category>
-  <category>learning</category>
-  <category>ai-collaboration</category>
-  <category>dataviz</category>
-  <category>d3</category>
-  <category>debugging</category>
-  <category>ux</category>
-  <guid>https://chendaniely.github.io/genai-learning-moments/posts/2026-07-20-snap-to-nearest-object.html</guid>
-  <pubDate>Mon, 20 Jul 2026 00:00:00 GMT</pubDate>
 </item>
 </channel>
 </rss>
