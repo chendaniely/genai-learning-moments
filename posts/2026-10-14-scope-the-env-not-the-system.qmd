@@ -1,0 +1,296 @@
+---
+title: "Learning Moment: Scope the Environment, Not the System"
+date: 2026-10-14
+categories: [claude, learning, ai-collaboration, linux, shell, python, teaching]
+---
+
+## Context
+
+Installing a package from the AUR on Arch Linux with `yay`.
+The package is an Electron app,
+so its `PKGBUILD` downloads the upstream binary
+and repacks it against the system `electron` runtime.
+The repacking is done by `asar`,
+installed from the Arch repositories as an ordinary system package.
+
+The build never got that far.
+
+## The Initial Ask
+
+> i'm trying to install orca ade in arch linux. getting this error:
+
+```
+[user@host ~]$ yay -S orca-ide-bin
+...
+==> Starting prepare()...
+Electron version: 43
+file:///usr/lib/node_modules/@electron/asar/bin/asar.mjs:3
+import packageJSON from '../package.json' with { type: 'json' };
+                                          ^^^^
+
+SyntaxError: Unexpected token 'with'
+    at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:152:18)
+
+Node.js v18.19.0
+==> ERROR: A failure occurred in prepare().
+    Aborting...
+```
+
+## Claude's Initial Response
+
+The useful line is the one that looks like boilerplate: `Node.js v18.19.0`.
+
+Arch is a rolling release.
+Its `nodejs` package tracks the current release,
+and there is no way a package freshly installed from the Arch repositories
+is running on a Node from 2023.
+So the question is not "why is `asar` broken"
+but "why is this Node answering."
+
+```bash
+$ which -a node
+~/.nvm/versions/node/v18.19.0/bin/node
+/usr/bin/node
+
+$ node --version
+v18.19.0
+
+$ /usr/bin/node --version
+v26.11.1
+```
+
+Two Nodes, and the wrong one is first.
+The rest follows:
+
+```bash
+$ ls -l /usr/bin/asar
+/usr/bin/asar -> ../lib/node_modules/@electron/asar/bin/asar.mjs
+
+$ head -3 /usr/lib/node_modules/@electron/asar/bin/asar.mjs
+#!/usr/bin/env node
+
+import packageJSON from '../package.json' with { type: 'json' };
+```
+
+`asar` is a system package, installed by `pacman`,
+and its shebang is `#!/usr/bin/env node` — not `/usr/bin/node`.
+It does not ask for *the system's* Node.
+It asks for *whatever `node` means in this shell*,
+and in this shell `node` means a version manager's copy of Node 18.19.0.
+
+Import attributes (`with { type: 'json' }`) arrived in Node 18.20 and 20.10.
+Run the exact same file under the Node that was actually installed alongside it,
+and it is fine:
+
+```bash
+$ /usr/bin/node /usr/lib/node_modules/@electron/asar/bin/asar.mjs --version
+v0.0.0-development
+```
+
+So Claude gave the fix — put the system Node first for the duration of the build:
+
+```bash
+PATH=/usr/bin:$PATH yay -S orca-ide-bin
+```
+
+and then added a second half, to stop it recurring:
+
+```bash
+nvm alias default system      # or: nvm alias default 24
+```
+
+## The Exchange
+
+**Turn 1 — User:**
+
+> can we use this skill to capture this learning moment […]
+> it's about the importance of virtual environments
+> and not changing system versions of things
+> because it will affect other system tools.
+> this is a similar concept in python
+> and why we use venvs in python
+> and other tools like uv, conda, pixi, pyenv, etc
+
+**Turn 1 — Claude:**
+
+The reframe lands on Claude's own second half.
+
+`nvm alias default system` and `nvm alias default 24`
+had been offered as interchangeable — pick whichever you like —
+and they are not interchangeable at all.
+They are the two sides of the lesson.
+
+`nvm alias default system` says: *this machine's `node` is the system's `node`,
+and my version manager speaks up only when a project asks it to.*
+
+`nvm alias default 24` says: *this machine's `node` is Node 24, globally, for everything.*
+Which is the exact sentence that caused the bug.
+It was true of 18.19.0 too, on the day it was set,
+when 18.19.0 was a perfectly reasonable thing to want.
+Node 24 is simply the 18.19.0 of a few years from now.
+
+The bug is not that the pinned version was old.
+The bug is that a pin made for one project
+became the answer to `node` for every process on the machine,
+including a package build that has nothing to do with the project,
+in a language ecosystem the user was not even thinking about at the time.
+
+## The Final Solution
+
+The one-off, for the build at hand — scoped to a single command,
+changing nothing about the machine:
+
+```bash
+PATH=/usr/bin:$PATH yay -S orca-ide-bin
+```
+
+The standing fix — hand `node` back to the system,
+and let the version manager be something a project opts into:
+
+```bash
+nvm alias default system
+```
+
+```bash
+# in the project that actually needs Node 18
+$ cd ~/projects/the-one-that-needs-18
+$ echo "18.19.0" > .nvmrc
+$ nvm use
+Now using node v18.19.0
+```
+
+The version is now written down next to the code that requires it,
+which is also the only place a reader would think to look for it.
+Outside that directory, `node` is the system's Node,
+and `asar` — a system package with a `#!/usr/bin/env node` shebang —
+gets the Node it was installed next to.
+
+The same shape, across ecosystems:
+
+| Ecosystem | The trap | The scoped form |
+|---|---|---|
+| Node | `nvm alias default 18.19.0` | `.nvmrc` + `nvm use`, default left at `system` |
+| Python | `pyenv global 3.11`, `pip install --user`, installing into the system interpreter | `python -m venv .venv`, `uv`, `pixi`, `conda` envs, `.python-version` per project |
+| R | installing into the system library | `renv::init()` per project |
+| Rust | `rustup default nightly` | `rust-toolchain.toml` in the repo |
+
+Python is where most people meet this first,
+and where the tooling is most insistent about it:
+a virtual environment exists precisely so that
+"this project needs `pandas` 1.5" is a fact about *the project*
+and not a fact about *the computer*.
+See also [A Program, or a Module?](2026-08-26-venv-is-a-module.qmd)
+for what `venv` actually is when you go looking for it.
+
+Everything above is the same idea with different file names.
+And the failure mode is always the one that showed up here:
+the damage does not appear in the project you configured.
+It appears months later, in some unrelated tool,
+which stops working for reasons that look like its own fault.
+
+## The Lesson
+
+**What Claude got right:**
+
+The diagnosis, and the shape of the immediate fix.
+Reading `Node.js v18.19.0` as the anomaly rather than the footer,
+checking `which -a node` instead of the package,
+and proving it by running the same file under `/usr/bin/node` —
+that is the correct order of operations,
+and it kept the user from filing a bug against a package that has none.
+
+The immediate fix was correctly scoped, too.
+`PATH=/usr/bin:$PATH yay -S …` changes one command's environment
+and leaves no trace on the machine.
+Claude reached for the narrow fix first without being asked to.
+
+**What required human expertise:**
+
+Recognising the bug as an instance of a class.
+
+To Claude this was a Node version problem on an Arch box.
+To someone who teaches environments for a living
+it is the canonical example of why environments are scoped:
+a global default is a claim about every process on the machine,
+made by someone who was thinking about one project.
+
+That recognition is what exposed the flaw in the advice.
+Claude offered `nvm alias default system` and `nvm alias default 24`
+as a matter of taste.
+Someone holding the general principle can see immediately
+that one of them is the lesson and the other is the bug with a fresher number on it.
+
+**Why Claude missed it:**
+
+*The stated goal was the whole frame.*
+"Make this install work" was the ask, and both halves of the answer do that.
+The second half also quietly re-arms the trap,
+but only for a build that has not happened yet,
+asked about by a user who has not asked yet.
+Nothing in the question pointed at the future.
+
+*A stale value, not a stale mechanism.*
+Claude read `18.19.0` as the wrong **number** and reached for a better number.
+The number was never the problem.
+The problem is a pin that outlives the reason it was set,
+and swapping in Node 24 preserves that property perfectly.
+Fixing the value where the mechanism is at fault is a very easy mistake to make
+when the value is sitting right there in the error message, looking wrong.
+
+*No view of elapsed time.*
+18.19.0 was presumably pinned on purpose, for something, on a day when it was correct.
+Claude sees the end state and none of the months in between —
+the months in which a deliberate, local, reasonable choice
+quietly became the global answer to `node`
+for a package manager building software in a different ecosystem entirely.
+The cost of a global pin is paid later, by a different tool, in a different context.
+That is exactly the kind of cost a single-session view cannot see.
+
+*The symptom and the cause were in different ecosystems.*
+The error was a Node syntax error inside a Node tool,
+so the investigation stayed in Node-land and produced a Node-land answer.
+But the cause is a PATH-ordering policy that spans every language on the machine.
+The evidence was literally on screen:
+
+```
+PATH=/usr/share/positron/bin:~/.nvm/versions/node/v18.19.0/bin:
+     ~/.pyenv/shims:/usr/local/bin:/usr/bin:...
+             ^^^^^^^^^^^^^^^^
+             same position, same mechanism, different language
+```
+
+Claude printed that line while diagnosing, used the `nvm` entry, and read right past the rest.
+Having answered the Node question, it stopped looking —
+even though the generalisation was sitting three colons to the right.
+
+**Worth noting — the machine was already half-right.**
+
+On the Python side of the same box, the principle was already in force:
+
+```bash
+$ pyenv version
+system (set by ~/.python-version)
+```
+
+The global pyenv version is `system`.
+The shims are ahead of `/usr/bin` in `PATH`, exactly like nvm's,
+but they resolve to the system interpreter and get out of the way,
+so a system tool with `#!/usr/bin/env python3` gets the Python it was installed next to.
+
+So this was not someone learning the idea for the first time.
+It was someone who had already applied it,
+in the ecosystem that teaches it loudest,
+and had one version manager in another ecosystem
+left quietly pinned to a number set for a project long since finished.
+
+Which is the most honest version of the lesson:
+knowing the principle is not the same as having it configured everywhere,
+and the place you have not configured it
+will tell you about it in the least convenient way it can.
+
+**Key takeaway:**
+
+A version manager's global default is a decision about every tool on the machine,
+not just about your project —
+so pin the version next to the project that needs it,
+and leave the system pointing at the system.
