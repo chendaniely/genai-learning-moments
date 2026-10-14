@@ -2,6 +2,7 @@
   {
     "listing": "/index.html",
     "items": [
+      "/posts/2026-10-14-scope-the-env-not-the-system.html",
       "/posts/2026-10-08-guard-dont-warn.html",
       "/posts/2026-10-07-summaries-lose-the-argument.html",
       "/posts/2026-10-07-use-the-framework-first.html",
