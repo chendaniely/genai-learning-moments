@@ -1,0 +1,209 @@
+---
+title: "Learning Moment: Pointing the Model at a Built-In: Quarto's Lightbox"
+date: 2026-10-14
+categories: [claude, learning, ai-collaboration, quarto, over-engineering, testing]
+---
+
+## Context
+
+A Quarto website that documents a personal local-AI stack:
+one home server running open models,
+reached from a laptop and a phone.
+The site is almost all documentation,
+and its Architecture page explains the stack mostly through Mermaid diagrams.
+
+The session's main task was a new overview diagram for the home page.
+Partway through, the user raised a second problem:
+the biggest diagram on the Architecture page was unreadable.
+
+## The Initial Ask
+
+The request arrived while Claude was still working on the overview:
+
+> "while we're at it. in the architecture page, the image for where everythign its is very small text. we should fix that or make the image clickable and zoomable like in an image lightbox"
+
+## Claude's Initial Response
+
+Claude measured the problem first.
+The diagram was 3,445 pixels wide, squeezed into an 800-pixel text column,
+so it showed at 23% of its natural size.
+Redrawing it left to right didn't help (it came out 2,240 × 1,840, still about 36%):
+the diagram has about 25 parts, so it is simply big.
+
+Claude concluded that zoom was the real fix, and wrote one.
+It produced about 150 lines of dependency-free HTML, CSS and JavaScript in an include file:
+click a diagram, and a full-screen `<dialog>` opens a copy of the SVG at natural size,
+with −, 100%, + and Fit buttons, drag to pan, and ctrl-scroll to zoom.
+Claude rendered the site with it;
+the user's next message arrived before it had opened the result in a browser.
+
+What Claude didn't do was check whether Quarto already had a feature for this.
+It had a hunch that Quarto's lightbox only handles images,
+since Quarto draws Mermaid diagrams in the browser as inline SVG,
+and it treated that hunch as an answer instead of looking it up.
+
+## The Exchange
+
+**Turn 1 — User:**
+
+> "quarto has a lightbox feature: https://quarto.org/docs/output-formats/html-lightbox-figures.html"
+
+**Turn 1 — Claude:**
+Read the page.
+The hunch was right as far as it went:
+the lightbox only applies to images,
+and nothing on the page mentions diagrams.
+But checking turned up a route the hunch had missed.
+Quarto can also render Mermaid to an image at build time.
+
+Claude tested both build-time formats on a three-node diagram:
+
+- `mermaid-format: svg` still produced an inline `<svg>`, with no lightbox.
+- `mermaid-format: png` produced `<a class="lightbox"><img …></a>`. The lightbox wraps it.
+
+Then it rendered the real Architecture page that way, in a scratch copy,
+and clicked through it in a browser.
+The lightbox opened the diagram fitted to the screen,
+a second click zoomed to full resolution,
+and dragging moved it around.
+Then it tried its own script on the real build for the first time,
+so the two could be compared on the same page.
+
+Rather than switch on its own, Claude put the choice to the user,
+with what each would cost:
+
+> **Quarto's lightbox (Recommended)**: "Built in, so there's no custom code to maintain. Diagrams render to PNG at build time (mermaid-format: png). … Costs: the build needs a headless Chrome … Diagram text becomes pixels, so each diagram needs a short fig-alt. The page grows by about 1.2 MB."
+>
+> **The click-to-zoom script**: "About 150 lines of plain JS in one file. Diagrams stay as inline SVG, so the text stays sharp at any zoom and stays text. … Nothing extra at build time, but it's custom code in a docs repo."
+
+**Turn 2 — User:**
+Picked "Quarto's lightbox (Recommended)".
+
+**Turn 2 — Claude:**
+Removed its script and switched the site to PNG diagrams.
+It checked how that version of Quarto finds Chrome on Linux
+(`which google-chrome`, then `which chromium-browser`),
+and that the CI runner's image ships Google Chrome,
+so the build would work in CI too.
+Then the real pages turned up three problems the toy diagram hadn't:
+
+- Wrapping a diagram in a `.column-page` div stopped the lightbox from attaching to it. The cell option `%%| column: page` worked.
+- `fig-alt` never reached the image. Three variants were tried, and none produced an `alt` attribute.
+- The overview's PNG was cropped: its right and bottom edges were simply missing from the file.
+
+One test document with `%%| fig-width: 16` rendered the overview whole.
+On the strength of that single test, Claude asked again, and stated a fix as fact:
+
+> "Only a per-diagram `%%| fig-width` prevents that (the site-wide setting is ignored), and that number has to grow whenever its diagram does."
+
+It recommended the script this time,
+and offered the lightbox "anyway" with a per-diagram `fig-width` and a small CSS rule.
+
+**Turn 3 — User:**
+Picked "Quarto's lightbox anyway".
+
+**Turn 3 — Claude:**
+To set each diagram's `fig-width` from evidence rather than guesses,
+Claude wrote a small check that flags a PNG whose drawing touches its edges.
+It first ran the check on the overview it knew was cropped,
+to see it fail, and on the `fig-width: 16` render, to see it pass.
+Then it ran the check on everything:
+four of the five diagrams were cropped at their current settings.
+
+Rendering each diagram at two widths showed the claim from Turn 2 was wrong.
+`fig-width` only changed the size the image was *displayed* at,
+the PNG came out the same,
+and the overview at `fig-width: 16` was cropped this time.
+Claude said so plainly before going any further:
+
+> "I have to stop and correct what I told you. **`fig-width` doesn't fix the crop.** It only changes the size the image is displayed at. The PNG Quarto renders comes out the same size whatever `fig-width` says."
+
+It offered three options:
+the script; Quarto's lightbox on SVGs made beforehand with a pinned mermaid-cli build step;
+or just widening the diagrams for now.
+
+**Turn 4 — User:**
+
+> "dragging to click and pan is okay. let's keep the source plain text (e.g., mermaid) the output on how to view the results i'm less worried about at the moment. let' sjust get somethign up tehre first"
+
+**Turn 4 — Claude:**
+Put the script back, with the diagrams staying plain Mermaid text drawn in the browser,
+and turned the PNG step off.
+
+**Turn 5 — User:**
+A second pointer to the tool's own features, this time for the size problem itself:
+
+> "looking at the image, if we use .column-screen-inset and make the image a bit smaller the image seems it will fit. i think that's an okay compromise https://quarto.org/docs/authoring/article-layout.html"
+
+**Turn 5 — Claude:**
+Set `%%| column: screen-inset` on the big diagram.
+On a laptop-width window it went from 23% of its natural size to 40%,
+and Quarto folds the page's table of contents into an "On this page" menu
+while a wide figure is in view, so the two don't collide.
+
+**Turn 6 — User:**
+
+> "but the note to click to zoom and the note to drag seem good too (in the archetecture page)"
+
+## The Final Solution
+
+- **The click-to-zoom script stayed:** one include file, added after the body of every page in `_quarto.yml`, with no library. Diagrams stay as Mermaid source in the `.qmd` files.
+- **The biggest diagram uses Quarto's `screen-inset` column**, from the user's pointer to the article-layout docs. The overview uses `page`.
+- **The script's header records why the built-in wasn't used**, so the next person doesn't re-run the experiment blind:
+
+  ```html
+  <!-- Click or tap any Mermaid diagram to open it full-screen, at its natural size, to zoom and pan.
+       Included after the body of every page by _quarto.yml. No library: a <dialog> and a copy of the SVG.
+       Quarto's own lightbox needs mermaid-format: png, whose renders cropped wide diagrams (2026-10-14). -->
+  ```
+
+The custom code survived, but now for a reason that was tested, written down,
+and chosen by the user with the alternatives in front of them.
+
+Asked afterwards whether to write this up, the user named what mattered:
+
+> "i wanted to make sure we are learning our tools. the testing is something we would've done anyway, and would've bumped into. most important was me directeing you where to look and try first before makeing more custom stuff"
+
+## The Lesson
+
+**What Claude got right:**
+It measured the problem before fixing it,
+and its first fix worked.
+Once pointed at the lightbox, it didn't simply swap one for the other.
+It read the docs, found the images-only limit,
+found the `mermaid-format: png` route that gets around it,
+tried that on the real page rather than a toy,
+and handed the decision back with each option's costs.
+When its own claim turned out to be false,
+it built a check, watched it fail once, and retracted the claim plainly.
+
+**What required human expertise:**
+Knowing the tool's feature set.
+The user knew Quarto ships a lightbox,
+and later that its article-layout column classes could widen a figure past the text column,
+and linked the docs both times.
+That pointer changed what Claude did next:
+from extending its own code to testing what the tool already does.
+The user also made the closing judgment call:
+keep the diagrams as plain-text source, and ship something now.
+
+**Why Claude missed it:**
+"Make it zoomable" read as an implementation task,
+and for a coding agent writing code is always available,
+so it reached for that first.
+It had a hunch that the lightbox wouldn't apply, and the hunch was half right,
+but a hunch isn't a lookup, and only the lookup found the PNG route.
+The request also arrived mid-task,
+so it skipped the short design step the session's first request had gone through,
+and with it the moment to ask "does Quarto already do this?"
+Later, the same impulse to answer instead of check produced the one-test claim about `fig-width`,
+caught only because the next step was a check.
+
+The same habit appears in [A Hand-Built Card Where a Quarto Callout Would Do](2026-10-07-use-the-framework-first.qmd).
+This time the built-in lost, which makes the order the point:
+try the tool's feature first, then build custom code only for a reason you can name.
+
+**Key takeaway:**
+Knowing what your tools already do is how you steer an AI:
+name the built-in feature and link its docs,
+and the model switches from writing code to testing what exists, and brings the choice back to you.
