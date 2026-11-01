@@ -1,0 +1,190 @@
+---
+title: "Learning Moment: `.nojekyll` and `make publish`"
+date: 2026-10-30
+categories: [claude, learning, ai-collaboration, github, quarto, over-engineering, documentation]
+---
+
+## Context
+
+The project was a course's online book, written with Quarto
+and published to GitHub Pages from the `gh-pages` branch.
+Two GitHub Actions workflows did the work:
+
+- `publish.yml` rendered the book into `docs/` on every push to `main`
+  and published it with `quarto publish gh-pages`.
+- `pr.yml` rendered the book on every pull request,
+  so that changes could be checked before they were merged.
+
+The task was to give every pull request a live preview of the rendered book,
+using [pr-preview-action](https://github.com/rossjrw/pr-preview-action).
+It pushes each pull request's build to the `gh-pages` branch under `pr-preview/pr-<N>/`
+and comments the link on the pull request.
+
+Claude had already written a first version.
+It used two jobs: one built the book on the macOS runner the book always used,
+and a second, on Ubuntu, deployed the preview.
+The split rested on an assumption Claude had not checked:
+that pr-preview-action, a set of bash scripts, would not run on macOS.
+
+## The Initial Ask
+
+Quoted as typed:
+
+> "let's make sure the GHA workflows are pretty simple and we're using this
+> https://github.com/rossjrw/pr-preview-action for quarto"
+
+## Claude's Initial Response
+
+Claude read the action's README and its scripts.
+The scripts used nothing that macOS lacks,
+so the two jobs collapsed into the single job the README shows.
+That was the first assumption gone.
+
+The README also warned that the main deployment must not delete the previews:
+"If you don't do this, your main deployment may delete all of your currently-existing PR previews."
+`quarto publish gh-pages` does exactly that.
+It runs `git rm -r .` on the `gh-pages` branch before every publish.
+So, following the README, Claude switched `publish.yml` to render the book
+and deploy `docs/` with [github-pages-deploy-action](https://github.com/JamesIves/github-pages-deploy-action),
+using `clean-exclude: pr-preview` (keep the previews) and `force: false` (don't force-push).
+
+Then Claude noticed two more things, and acted on both.
+
+**A `.nojekyll` file.**
+The `gh-pages` branch had a `.nojekyll` file, which `quarto publish` had added.
+It tells GitHub Pages not to run Jekyll over the site.
+A local `docs/` folder had no `.nojekyll`,
+and the new deploy action "cleans" files that aren't in the folder it deploys.
+Claude concluded the deploy would delete the file, and added a step to recreate it:
+
+```yaml
+# tell GitHub Pages not to run Jekyll on the site (`quarto publish` used to add this)
+- name: Add .nojekyll
+  run: touch docs/.nojekyll
+```
+
+**The `make publish` target.**
+The project's Makefile still had a `publish` target that ran `quarto publish gh-pages` locally.
+That would now wipe every preview and force-push over the deploys from GitHub Actions,
+so Claude removed it:
+
+> One leftover footgun: `make publish` still runs `quarto publish gh-pages` locally.
+> That would wipe every PR preview and force-push over CI's deploys.
+> Since publishing now happens in CI on every push to `main`, I'll remove the target.
+
+## The Exchange
+
+**Turn 1 — User** (quoted as typed):
+
+> "i think we dont' need to touch the nojekull file if there is already a nojekyll file
+> in the root or in quarto project root? we aren't doing anythign to the docs directory
+> for deployment all deployments are under gh-pages"
+
+**Turn 1 — Claude:**
+
+Claude checked before answering, this time in the deploy action's own source and README.
+Its clean-up step excludes `.nojekyll` whenever the deployed folder doesn't have one:
+
+```typescript
+!fs.existsSync(`${action.folderPath}/${DefaultExcludedFiles.NOJEKYLL}`)
+  ? `--exclude ${DefaultExcludedFiles.NOJEKYLL}`
+  : ''
+```
+
+The README says the same thing in plain words:
+
+> If you're using a custom domain and require a `CNAME` file,
+> or if you require the use of a `.nojekyll` file,
+> you can safely commit these files directly into the deployment branch
+> without them being overridden after each deployment.
+
+So the step was unnecessary, and Claude removed it.
+The check also sharpened the user's reasoning.
+Neither the repository root nor the Quarto project root had a `.nojekyll`.
+The file that mattered was the one already on `gh-pages`,
+and the deploy action leaves it alone.
+The user's conclusion was right; the check showed exactly why.
+
+**Turn 2 — User** (quoted as typed):
+
+> "we should keep the make target for publish. but it should echo
+> "no need to manually pubblish, github actions will do this for you, including branch PRs"
+> or somethign liek that"
+
+**Turn 2 — Claude:**
+
+Claude put the target back.
+Instead of publishing, it now explains where publishing happens:
+
+```make
+publish: ## No need: GitHub Actions publishes the book and PR previews
+	@echo "No need to publish manually: GitHub Actions does this for you."
+	@echo "  - every push to main deploys the book to GitHub Pages (.github/workflows/publish.yml)"
+	@echo "  - every pull request from a branch gets a preview at pr-preview/pr-<N>/ (.github/workflows/pr.yml)"
+```
+
+`make help` lists it as
+"publish  No need: GitHub Actions publishes the book and PR previews".
+
+## The Final Solution
+
+The publish workflow renders the book and deploys it, with no `.nojekyll` step:
+
+```yaml
+- name: Render Quarto
+  uses: quarto-dev/quarto-actions/render@v2
+  with:
+    path: book
+
+# Unlike `quarto publish`, this keeps the PR previews in pr-preview/
+# and does not force-push, as the pr-preview-action README recommends.
+- name: Deploy to GitHub Pages
+  uses: JamesIves/github-pages-deploy-action@<pinned-sha> # v4.9.0
+  with:
+    folder: docs
+    branch: gh-pages
+    clean-exclude: pr-preview
+    force: false
+```
+
+The preview workflow is one job: check out, build (skipped when the pull request closes),
+then pr-preview-action, which deploys the preview or removes it.
+`make publish` stays as a signpost to the two workflows.
+
+## The Lesson
+
+**What Claude got right:**
+Claude found the real problem from the README:
+`quarto publish gh-pages` wipes the `gh-pages` branch, so it would delete every preview.
+It confirmed that in Quarto's own source before changing the publish workflow.
+It was right that `.nojekyll` matters to GitHub Pages,
+and right that a local `quarto publish` would undo what the workflows set up.
+
+**What required human expertise:**
+Two kinds of knowledge Claude didn't have.
+First, how this site is actually rendered and deployed:
+the render happens on the runner, and only the deploy touches `gh-pages`,
+so files already on `gh-pages` stay unless something removes them.
+Second, how people use the project:
+collaborators, old notes and muscle memory still reach for `make publish`.
+Deleting the target turns that into a bare
+"No rule to make target 'publish'" with no hint of what changed.
+Keeping the target and having it explain where publishing went
+documents the new workflow at the moment someone needs it.
+
+**Why Claude missed it:**
+Claude made the same kind of mistake three times in one task:
+it predicted a problem and patched it, instead of checking the tool that would cause it.
+It read pr-preview-action's README closely,
+but inferred the deploy action's behaviour from the everyday meaning of "clean"
+and from a local `docs/` folder, which shows what a render produces, not what a deploy keeps.
+Behind that was a migration reflex:
+"`quarto publish` used to add `.nojekyll`, so the replacement must add it too."
+The macOS assumption followed the same pattern.
+It only surfaced because the user asked for the workflows to be simple.
+For `make publish`, Claude optimized for the system (remove the footgun)
+rather than for the people who use it.
+
+**Key takeaway:**
+Before adding a step to replace what a migration might break, check what the new tool already preserves,
+and when you retire a command people know, make it say where the work went instead of deleting it.
