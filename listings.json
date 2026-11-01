@@ -2,6 +2,7 @@
   {
     "listing": "/index.html",
     "items": [
+      "/posts/2026-10-30-nojekyll-and-make-publish.html",
       "/posts/2026-10-14-point-it-at-the-builtin.html",
       "/posts/2026-10-14-scope-the-env-not-the-system.html",
       "/posts/2026-10-08-guard-dont-warn.html",
